@@ -3,6 +3,12 @@ set timeout -1
 set host [lindex $argv 0]
 set courses_dir [lindex $argv 1]
 set course_ids [lindex $argv 2]
+set required_bytes 0
+foreach id [split $course_ids " "] {
+  set size_kb [string trim [exec du -sk "$courses_dir/$id"]]
+  set required_bytes [expr {$required_bytes + [lindex $size_kb 0] * 1024}]
+}
+set required_bytes [expr {$required_bytes + 2147483648}]
 set socket "/tmp/pdeploy-[pid]-[clock seconds]"
 
 proc handle_auth {host} {
@@ -33,10 +39,10 @@ if {[handle_auth $host] != 0} {
   exit 1
 }
 
-set preflight {set -eu; avail=$(df -PB1 /opt/vhiti | awk 'NR==2 {print $4}'); marker=/opt/vhiti/instance/media/courses/.pdeploy-upload-started; if [ ! -e "$marker" ] && [ "$avail" -lt 53687091200 ]; then echo "На сервере меньше 50 ГБ свободного места: ${avail} bytes. Курсы не загружены."; exit 42; fi; mkdir -p /opt/vhiti/instance/media/courses; touch "$marker"; if ! command -v rsync >/dev/null 2>&1; then apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y rsync; fi; echo "Свободного места: $((avail / 1073741824)) GiB."}
+set preflight "set -eu; avail=\$(df -PB1 /opt/vhiti | awk 'NR==2 {print \$4}'); required=$required_bytes; if [ \$avail -lt \$required ]; then echo \"Недостаточно места для выбранных курсов: свободно \$((avail / 1073741824)) GiB, требуется примерно \$((required / 1073741824)) GiB с запасом. Курсы не загружены.\"; exit 42; fi; mkdir -p /opt/vhiti/instance/media/courses; if ! command -v rsync >/dev/null 2>&1; then apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y rsync; fi; echo \"Свободного места: \$((avail / 1073741824)) GiB; требуется с запасом: \$((required / 1073741824)) GiB.\""
 spawn ssh -S $socket -o BatchMode=yes $host $preflight
 expect {
-  -re {На сервере меньше 50 ГБ свободного места} { puts stderr $expect_out(0,string); exp_continue }
+  -re {Недостаточно места для выбранных курсов} { puts stderr $expect_out(0,string); exp_continue }
   eof {}
 }
 catch wait result
