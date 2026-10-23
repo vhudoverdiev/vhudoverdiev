@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}{{ lesson.title }} · {{ course.title }}{% endblock %}
-{% block body_class %}app-body{% endblock %}
+{% block body_class %}app-body learning-body{% endblock %}
 {% block content %}
 <div class="app-shell">
   <aside class="sidebar" id="sidebar">
@@ -14,11 +14,11 @@
       <a class="back-link" href="{{ url_for('main.course_detail', course_id=course.id) }}">← К программе курса</a>
       <div class="lesson-heading"><div><span class="eyebrow muted-eyebrow">{{ lesson.module_name }}</span><h1>{{ lesson.title }}</h1></div><span class="lesson-course-tag">{{ course.title }}</span></div>
       {% if lesson.video_url and lesson.video_url.startswith('local:') %}
-      <div class="video-frame"><video controls playsinline preload="metadata" data-progress-url="{{ url_for('main.update_lesson_progress', lesson_id=lesson.id) }}"><source src="{{ url_for('main.media_file', filename=lesson.video_url[6:]) }}" type="video/mp4">Ваш браузер не поддерживает воспроизведение видео.</video></div>
+      <div class="video-frame" aria-label="Видеоурок"><video controls playsinline preload="metadata" data-progress-url="{{ url_for('main.update_lesson_progress', lesson_id=lesson.id) }}"><source src="{{ url_for('main.media_file', filename=lesson.video_url[6:]) }}" type="video/mp4">Ваш браузер не поддерживает воспроизведение видео.</video></div><p class="player-caption" role="status">После просмотра — проверка знаний ниже ↓</p>
       {% elif lesson.content %}<article class="lesson-reading">{{ lesson.content }}</article>
       {% endif %}
       {% if not lesson.quiz_data and not lesson.video_url %}
-      <form method="post" action="{{ url_for('main.update_lesson_progress', lesson_id=lesson.id) }}" class="reading-complete-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="watched_percent" value="100"><button class="button-dark" type="submit">{% if progress and progress.completed %}Материал пройден ✓{% else %}Отметить материал пройденным{% endif %}</button></form>
+      <form method="post" action="{{ url_for('main.update_lesson_progress', lesson_id=lesson.id) }}" class="reading-complete-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="watched_percent" value="100"><input type="hidden" name="return_to_lesson" value="1"><button class="button-dark" type="submit">{% if progress and progress.completed %}Материал пройден ✓{% else %}Отметить материал пройденным{% endif %}</button></form>
       {% endif %}
       {% if lesson.resources_json %}
       <section class="lesson-resources"><div class="eyebrow muted-eyebrow">МАТЕРИАЛЫ К УРОКУ</div><div class="resource-list">
@@ -26,9 +26,10 @@
       </div></section>
       {% endif %}
       {% if quiz_questions %}
-      <section class="quiz-panel" id="lesson-quiz"><div class="quiz-panel-heading"><span class="quiz-panel-icon">✓</span><div><div class="eyebrow muted-eyebrow">ПРОВЕРКА ЗНАНИЙ · {{ quiz_questions|length }} ВОПРОСА</div><h2>Закрепим тему</h2><p>Ответьте на вопросы по материалам этого раздела. Результат сохранится в вашем прогрессе.</p></div></div>
+      <section class="quiz-panel" id="lesson-quiz"><div class="quiz-panel-heading"><span class="quiz-panel-icon">✓</span><div><div class="eyebrow muted-eyebrow">ПРОВЕРКА ЗНАНИЙ · {{ quiz_questions|length }} ВОПРОСОВ</div><h2>Закрепим урок</h2><p>Ответьте на вопросы по теме этого урока. Результат сохранится в вашем прогрессе.</p></div></div>
         {% if attempt %}<p class="quiz-last-result">Последняя попытка: <strong>{{ attempt.score }} из {{ attempt.question_count }}</strong></p>{% endif %}
-        <form method="post" action="{{ url_for('main.submit_lesson_quiz', lesson_id=quiz_lesson.id) }}" class="quiz-form">
+        <form method="post" action="{{ url_for('main.submit_lesson_quiz', lesson_id=quiz_lesson.id) }}" class="quiz-form" data-question-count="{{ quiz_questions|length }}">
+          <p class="quiz-status" aria-live="polite">Выбрано ответов: <span data-answer-count>0</span> из {{ quiz_questions|length }}</p>
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="return_lesson_id" value="{{ lesson.id }}">
           {% for question in quiz_questions %}

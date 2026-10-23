@@ -61,3 +61,17 @@
     video.addEventListener('ended', saveProgress);
   });
 })();
+
+// Keep long checks readable and prevent accidental duplicate submissions.
+document.querySelectorAll('.quiz-form').forEach((form) => {
+  const counter = form.querySelector('[data-answer-count]');
+  const update = () => {
+    if (counter) counter.textContent = String(new Set(Array.from(form.querySelectorAll('input[type="radio"]:checked'), (input) => input.name)).size);
+  };
+  form.addEventListener('change', update);
+  update();
+  form.addEventListener('submit', () => {
+    const button = form.querySelector('button[type="submit"]');
+    if (button) { button.disabled = true; button.textContent = 'Проверяем ответы…'; }
+  });
+});

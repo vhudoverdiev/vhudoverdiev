@@ -52,6 +52,46 @@ def create_app(config_class=Config):
         db.session.commit()
         click.echo(f"Администратор {email} создан.")
 
+    @app.cli.command("create-user")
+    @click.option("--name", prompt="Имя ученика")
+    @click.option("--email", prompt="Электронная почта")
+    @click.password_option()
+    @with_appcontext
+    def create_user(name, email, password):
+        """Create a student from the terminal; no account management web UI."""
+        from email_validator import validate_email, EmailNotValidError
+        from .models import User
+        try:
+            email = validate_email(email.strip(), check_deliverability=False).normalized.lower()
+        except EmailNotValidError as error:
+            raise click.ClickException(str(error)) from error
+        if not name.strip() or len(name.strip()) > 120 or len(password) < 8:
+            raise click.ClickException("Укажите имя до 120 символов и пароль от 8 символов.")
+        if User.query.filter_by(email=email).first():
+            raise click.ClickException("Аккаунт с такой почтой уже существует.")
+        user = User(name=name.strip(), email=email, is_admin=False)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        click.echo(f"Аккаунт {email} создан.")
+
+    @app.cli.command("retire-ai-course")
+    @click.option("--delete-media", is_flag=True, help="Удалить серверную папку courses/1")
+    @with_appcontext
+    def retire_ai_course_command(delete_media):
+        """Remove the AI course retired by its owner and its learning records."""
+        from .services.retired_courses import retire_ai_course
+        count = retire_ai_course()
+        if delete_media:
+            import shutil
+            from pathlib import Path
+            folder = Path(app.config["MEDIA_ROOT"]) / "courses" / "1"
+            if folder.is_symlink():
+                folder.unlink()
+            elif folder.exists():
+                shutil.rmtree(folder)
+        click.echo(f"Удалено курсов AI Developer: {count}.")
+
     @app.cli.command("seed-demo")
     @with_appcontext
     def seed_demo():
@@ -70,20 +110,20 @@ def create_app(config_class=Config):
         click.echo("Добавлены демо-курсы. Замените их реальными материалами перед запуском.")
 
     @app.cli.command("import-courses")
-    @click.option("--root", default=None, help="Папка с материалами Курсы/1…4")
-    @click.option("--course", "selected_courses", multiple=True, type=click.Choice(["1", "2", "3", "4"]), help="Номер папки курса для импорта; можно указать несколько раз")
+    @click.option("--root", default=None, help="Папка с материалами Курсы/2, 3, 4")
+    @click.option("--course", "selected_courses", multiple=True, type=click.Choice(["2", "3", "4"]), help="Номер папки курса для импорта; можно указать несколько раз")
     @with_appcontext
     def import_courses(root, selected_courses):
         """Import selected prepared course folders into the catalog."""
         from .course_importer import import_course_folders
         source = root or os.path.join(app.instance_path, "media", "courses")
-        summary = import_course_folders(source, selected_courses or ("1", "2", "3", "4"))
+        summary = import_course_folders(source, selected_courses or ("2", "3"))
         click.echo(summary)
 
     @app.errorhandler(403)
     def forbidden(_error):
         from flask import render_template
-        return render_template("error.html", code=403, message="Этот раздел доступен только администратору."), 403
+        return render_template("error.html", code=403, message="Недостаточно прав для этого действия."), 403
 
     @app.errorhandler(404)
     def not_found(_error):

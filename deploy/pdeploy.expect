@@ -3,12 +3,15 @@ set timeout -1
 set host [lindex $argv 0]
 set courses_dir [lindex $argv 1]
 set course_ids [lindex $argv 2]
+set mode [lindex $argv 3]
 set required_bytes 0
+if {$mode ne "code-only"} {
 foreach id [split $course_ids " "] {
   set size_kb [string trim [exec du -sk "$courses_dir/$id"]]
   set required_bytes [expr {$required_bytes + [lindex $size_kb 0] * 1024}]
 }
 set required_bytes [expr {$required_bytes + 2147483648}]
+}
 set socket "/tmp/pdeploy-[pid]-[clock seconds]"
 
 proc handle_auth {host} {
@@ -39,6 +42,7 @@ if {[handle_auth $host] != 0} {
   exit 1
 }
 
+if {$mode ne "code-only"} {
 set preflight [format {set -eu; avail=$(df -PB1 /opt/vhiti | awk 'NR==2 {print $4}'); required=%d; if [ "$avail" -lt "$required" ]; then echo "Недостаточно места для выбранных курсов: свободно $((avail / 1073741824)) GiB, требуется примерно $((required / 1073741824)) GiB с запасом. Курсы не загружены."; exit 42; fi; mkdir -p /opt/vhiti/instance/media/courses; if ! command -v rsync >/dev/null 2>&1; then apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y rsync; fi; echo "Свободного места: $((avail / 1073741824)) GiB; требуется с запасом: $((required / 1073741824)) GiB."} $required_bytes]
 spawn ssh -S $socket -o BatchMode=yes $host $preflight
 expect {
@@ -70,10 +74,18 @@ foreach id [split $course_ids " "] {
   }
 }
 
+}
+
 set course_args ""
 foreach id [split $course_ids " "] { append course_args " --course $id" }
-set remote "bash /opt/vhiti/deploy/release.sh && chown -R vhiti:vhiti /opt/vhiti/instance/media/courses && sudo -u vhiti bash -lc 'cd /opt/vhiti && set -a && . /etc/vhiti/vhiti.env && set +a && .venv/bin/flask --app wsgi.py import-courses --root /opt/vhiti/instance/media/courses$course_args'"
-puts "Публикую обновление и импортирую курсы $course_ids."
+set release {git -C /opt/vhiti fetch origin main && git -C /opt/vhiti reset --hard origin/main && bash /opt/vhiti/deploy/release.sh}
+set remote "$release && chown -R vhiti:vhiti /opt/vhiti/instance/media/courses && sudo -u vhiti bash -lc 'cd /opt/vhiti && set -a && . /etc/vhiti/vhiti.env && set +a && .venv/bin/flask --app wsgi.py import-courses --root /opt/vhiti/instance/media/courses$course_args'"
+if {$mode eq "code-only"} {
+  set remote $release
+  puts "Публикую код и стили без передачи и импорта видео."
+} else {
+  puts "Публикую обновление и импортирую курсы $course_ids."
+}
 spawn ssh -S $socket -o BatchMode=yes $host $remote
 expect eof
 catch wait result
