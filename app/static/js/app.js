@@ -2,12 +2,38 @@
   const sidebar = document.getElementById('sidebar');
   const menuButton = document.querySelector('.mobile-menu');
   const closeButton = document.querySelector('.sidebar-toggle');
-  if (sidebar && menuButton) {
-    menuButton.addEventListener('click', () => sidebar.classList.add('sidebar-open'));
-    closeButton?.addEventListener('click', () => sidebar.classList.remove('sidebar-open'));
+  const backdrop = document.querySelector('.menu-backdrop');
+  const mobile = window.matchMedia('(max-width: 760px)');
+  const main = document.querySelector('.main-area');
+  if (sidebar && menuButton && backdrop) {
+    let open = false;
+    menuButton.setAttribute('aria-controls', 'sidebar');
+    menuButton.setAttribute('aria-expanded', 'false');
+    const setOpen = (value, restoreFocus = true) => {
+      open = value && mobile.matches;
+      sidebar.classList.toggle('sidebar-open', open);
+      document.body.classList.toggle('menu-is-open', open);
+      backdrop.hidden = !open;
+      sidebar.inert = mobile.matches && !open;
+      if (main) main.inert = open;
+      menuButton.setAttribute('aria-expanded', String(open));
+      if (open) (closeButton || sidebar.querySelector('a'))?.focus();
+      else if (restoreFocus && mobile.matches) menuButton.focus();
+    };
+    menuButton.addEventListener('click', () => setOpen(!open));
+    closeButton?.addEventListener('click', () => setOpen(false));
+    backdrop.addEventListener('click', () => setOpen(false));
+    sidebar.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => setOpen(false)));
     document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') sidebar.classList.remove('sidebar-open');
+      if (event.key === 'Escape' && open) setOpen(false);
+      if (event.key !== 'Tab' || !open) return;
+      const items = Array.from(sidebar.querySelectorAll('a[href], button, input')).filter((el) => !el.disabled && el.getClientRects().length);
+      const first = items[0], last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     });
+    mobile.addEventListener('change', () => setOpen(false, false));
+    setOpen(false, false);
   }
   document.querySelectorAll('.flash-close').forEach((button) => {
     button.addEventListener('click', () => button.closest('.flash')?.remove());

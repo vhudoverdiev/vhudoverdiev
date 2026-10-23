@@ -4,38 +4,39 @@
 {% block content %}
 <div class="app-shell">
   <aside class="sidebar" id="sidebar">
+    <button type="button" class="icon-btn sidebar-toggle" aria-label="Закрыть меню">{{ icon('close') }}</button>
     <a class="brand brand-light" href="{{ url_for('main.dashboard') }}"><span class="brand-mark">В</span><span>Войти в IT</span></a>
     <div class="side-label">ОБУЧЕНИЕ</div>
     <nav class="side-nav" aria-label="Основная навигация">
-      <a class="side-link" href="{{ url_for('main.dashboard') }}"><span class="nav-icon">▦</span>Обзор</a>
+      <a class="side-link" href="{{ url_for('main.dashboard') }}"><span class="nav-icon">{{ icon('grid') }}</span>Обзор</a>
 
     </nav>
     <div class="sidebar-bottom"><small class="sidebar-copy">© 2026 Войти в IT</small></div>
   </aside>
   <main class="main-area">
     <header class="topbar">
-      <button class="mobile-menu icon-btn" aria-label="Открыть меню">☰</button>
+      <button class="mobile-menu icon-btn" aria-label="Открыть меню">{{ icon('menu') }}</button>
       <div class="breadcrumb"><a href="{{ url_for('main.courses') }}">Каталог</a><span>/</span><strong>{{ course.category }}</strong></div>
       <div class="topbar-right"><span class="top-avatar">{{ current_user.name[:1]|upper }}</span></div>
     </header>
     <div class="page-content detail-content">
-      <a class="back-link" href="{{ url_for('main.courses') }}">← Назад к курсам</a>
+      <a class="back-link" href="{{ url_for('main.courses') }}">{{ icon('arrow-left') }} Назад к курсам</a>
       <section class="detail-hero">
-        <div class="course-top"><span class="course-icon {{ course.color }}">{{ course.icon }}</span><span class="course-level">{{ course.level }}</span></div>
+        <div class="course-top"><span class="course-icon {{ course.color }}">{{ course_icon(course) }}</span><span class="course-level">{{ course.level }}</span></div>
         <div class="course-category">{{ course.category }}</div>
         <h1>{{ course.title }}</h1><p>{{ course.description }}</p>
-        <div class="detail-meta"><span>◷ {{ course.duration }}</span><span>◫ {{ course.lessons|rejectattr('quiz_data')|list|length }} материалов</span>{% if course.course_type != 'library' %}<span>✓ Проверки знаний</span>{% endif %}</div>
+        <div class="detail-meta"><span>{{ icon('clock') }} {{ course.duration }}</span><span>{{ icon('book') }} {{ course.lessons|rejectattr('quiz_data')|list|length }} материалов</span>{% if course.course_type != 'library' %}<span>{{ icon('check') }} Проверки знаний</span>{% endif %}</div>
         {% set watched = progress.values()|selectattr('completed')|list|length %}
         <div class="course-progress-summary"><span>Завершено {{ watched }} из {{ course.lessons|rejectattr('quiz_data')|list|length }} уроков</span><span>{{ ((watched / (course.lessons|rejectattr('quiz_data')|list|length)) * 100)|round|int if course.lessons|rejectattr('quiz_data')|list|length else 0 }}%</span></div>
         <div class="progress-track"><i style="width:{{ ((watched / (course.lessons|rejectattr('quiz_data')|list|length)) * 100)|round|int if course.lessons|rejectattr('quiz_data')|list|length else 0 }}%"></i></div>
-        <div class="detail-decor" aria-hidden="true">{{ course.icon }}</div>
+        <div class="detail-decor" aria-hidden="true">{{ course_icon(course) }}</div>
       </section>
       <div class="detail-section-heading"><div><span class="eyebrow muted-eyebrow">ПРОГРАММА</span><h2>Материалы по темам</h2></div><span class="count-pill">{{ course.lessons|rejectattr('quiz_data')|list|length }} уроков</span></div>
       {% if course.lessons %}
       <div class="module-list">
         {% for module, lessons in course.lessons|groupby('module_name') %}
         <details class="module-card" {% if loop.first %}open{% endif %}>
-          <summary><span><small>ТЕМА {{ '%02d'|format(loop.index) }}</small><strong>{{ module or 'Материалы курса' }}</strong></span><span class="module-count">{{ lessons|rejectattr('quiz_data')|list|length }} <span>материалов</span>⌄</span></summary>
+          <summary><span><small>ТЕМА {{ '%02d'|format(loop.index) }}</small><strong>{{ module or 'Материалы курса' }}</strong></span><span class="module-count">{{ lessons|rejectattr('quiz_data')|list|length }} <span>материалов</span>{{ icon('chevron') }}</span></summary>
           {% set topic_lessons = lessons|rejectattr('quiz_data')|list %}
           {% set topic_quiz = lessons|selectattr('quiz_data')|first %}
           <div class="module-lessons">
@@ -47,7 +48,7 @@
                 {% elif lesson.video_url %}<p>Видеоурок · тест после урока{% if progress.get(lesson.id) and progress.get(lesson.id).completed %} · просмотрено{% endif %}</p>
                 {% else %}<p>Чтение · тест после урока</p>{% endif %}
               </div>
-              <a class="button-dark lesson-open" href="{{ url_for('main.lesson_detail', course_id=course.id, lesson_id=lesson.id) }}">Открыть <span>↗</span></a>
+              <a class="button-dark lesson-open" href="{{ url_for('main.lesson_detail', course_id=course.id, lesson_id=lesson.id) }}">Открыть <span>{{ icon('arrow-up-right') }}</span></a>
             </article>
             {% endfor %}
 
@@ -55,7 +56,7 @@
         </details>
         {% endfor %}
       </div>
-      {% else %}<div class="empty-card"><div class="empty-illustration">✦</div><div><h3>Материалы скоро появятся</h3><p>Мы готовим программу курса.</p></div></div>{% endif %}
+      {% else %}<div class="empty-card"><div class="empty-illustration">{{ icon('spark') }}</div><div><h3>Материалы скоро появятся</h3><p>Мы готовим программу курса.</p></div></div>{% endif %}
     </div>
   </main>
 </div>

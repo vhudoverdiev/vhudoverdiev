@@ -10,6 +10,11 @@ from .services.course_service import published_courses
 bp = Blueprint("main", __name__)
 
 
+@bp.get("/apple-touch-icon.png")
+def apple_touch_icon():
+    return send_from_directory(current_app.static_folder, "icons/icon-180.png", max_age=86400)
+
+
 @bp.get("/")
 def index():
     if current_user.is_authenticated:
