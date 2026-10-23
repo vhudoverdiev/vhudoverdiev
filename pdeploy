@@ -16,8 +16,8 @@ if ! command -v rsync >/dev/null 2>&1; then
   printf '%s\n' 'Не найден rsync. Установите его перед загрузкой курсов.' >&2
   exit 1
 fi
-if [ ! -d "$COURSES_DIR/1" ] || [ ! -d "$COURSES_DIR/2" ] || [ ! -d "$COURSES_DIR/3" ] || [ ! -d "$COURSES_DIR/4" ]; then
-  printf 'Не найдены папки 1–4 курсов: %s\nПуть можно задать через PDEPLOY_COURSES_DIR.\n' "$COURSES_DIR" >&2
+if [ ! -d "$COURSES_DIR/1" ] || [ ! -d "$COURSES_DIR/2" ] || [ ! -d "$COURSES_DIR/3" ]; then
+	printf 'Не найдены папки 1–3 курсов: %s\nПуть можно задать через PDEPLOY_COURSES_DIR.\n' "$COURSES_DIR" >&2
   exit 1
 fi
 
@@ -36,4 +36,4 @@ if [ "$BRANCH" != main ]; then
 fi
 
 git push origin main
-exec expect deploy/pdeploy.expect "$USER@$HOST" "$COURSES_DIR"
+exec expect deploy/pdeploy.expect "$USER@$HOST" "$COURSES_DIR" "1 2 3"

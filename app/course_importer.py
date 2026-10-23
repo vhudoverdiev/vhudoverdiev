@@ -401,13 +401,16 @@ def click_error(message):
     return ClickException(message)
 
 
-def import_course_folders(root):
+def import_course_folders(root, selected=("1", "2", "3", "4")):
     base = Path(root).resolve()
     if not base.is_dir():
         raise click_error(f"Папка материалов не найдена: {base}")
     importers = {"1": _import_ai, "2": _import_english, "3": _import_python, "4": _import_backend}
     results = []
-    for folder_name, importer in importers.items():
+    for folder_name in selected:
+        if folder_name not in importers:
+            raise click_error(f"Неизвестный номер курса: {folder_name}")
+        importer = importers[folder_name]
         folder = base / folder_name
         if not folder.is_dir():
             raise click_error(f"Не найдена папка курса {folder_name}: {folder}")

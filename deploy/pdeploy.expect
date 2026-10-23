@@ -2,6 +2,7 @@
 set timeout -1
 set host [lindex $argv 0]
 set courses_dir [lindex $argv 1]
+set course_ids [lindex $argv 2]
 set socket "/tmp/pdeploy-[pid]-[clock seconds]"
 
 proc handle_auth {host} {
@@ -46,23 +47,25 @@ if {[lindex $result 3] != 0} {
   exit 1
 }
 
-puts "Передаю папку курсов. Объём около 41 ГБ; rsync покажет прогресс и продолжит неполную передачу при повторном запуске."
-spawn rsync -a --partial --progress --exclude=.DS_Store -e "ssh -S $socket -o BatchMode=yes" "$courses_dir/" "$host:/opt/vhiti/instance/media/courses/"
-expect {
-  -re {Permission denied|Connection .* closed|No space left on device|rsync error} { puts stderr $expect_out(0,string); exp_continue }
-  eof {}
-}
-catch wait result
-if {[lindex $result 3] != 0} {
-  puts stderr "Передача материалов не завершилась. Повторите pdeploy: rsync продолжит загрузку."
-  spawn ssh -S $socket -o BatchMode=yes $host "true"
-  expect eof
-  catch {exec ssh -S $socket -O exit $host}
-  exit 1
+puts "Передаю курсы $course_ids. rsync покажет прогресс и продолжит неполные файлы при повторном запуске."
+foreach id [split $course_ids " "] {
+  spawn rsync -a --partial --progress --exclude=.DS_Store -e "ssh -S $socket -o BatchMode=yes" "$courses_dir/$id" "$host:/opt/vhiti/instance/media/courses/"
+  expect {
+    -re {Permission denied|Connection .* closed|No space left on device|rsync error} { puts stderr $expect_out(0,string); exp_continue }
+    eof {}
+  }
+  catch wait result
+  if {[lindex $result 3] != 0} {
+    puts stderr "Передача курса $id не завершилась. Повторите pdeploy: rsync продолжит загрузку."
+    spawn ssh -S $socket -o BatchMode=yes $host "true"
+    expect eof
+    catch {exec ssh -S $socket -O exit $host}
+    exit 1
+  }
 }
 
-set remote {bash /opt/vhiti/deploy/release.sh && chown -R vhiti:vhiti /opt/vhiti/instance/media/courses && sudo -u vhiti bash -lc 'cd /opt/vhiti && set -a && . /etc/vhiti/vhiti.env && set +a && .venv/bin/flask --app wsgi.py import-courses --root /opt/vhiti/instance/media/courses'}
-puts "Публикую обновление и импортирую четыре курса."
+set remote "bash /opt/vhiti/deploy/release.sh && chown -R vhiti:vhiti /opt/vhiti/instance/media/courses && sudo -u vhiti bash -lc 'cd /opt/vhiti && set -a && . /etc/vhiti/vhiti.env && set +a && .venv/bin/flask --app wsgi.py import-courses --root /opt/vhiti/instance/media/courses --courses $course_ids'"
+puts "Публикую обновление и импортирую курсы $course_ids."
 spawn ssh -S $socket -o BatchMode=yes $host $remote
 expect eof
 catch wait result
