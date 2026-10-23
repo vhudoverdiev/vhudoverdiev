@@ -4,6 +4,9 @@ cd /opt/vhiti
 git fetch origin main
 git reset --hard origin/main
 .venv/bin/pip install --disable-pip-version-check -r requirements.txt
+set -a
+. /etc/vhiti/vhiti.env
+set +a
 .venv/bin/flask --app wsgi.py db upgrade
 systemctl restart vhiti
 systemctl is-active --quiet vhiti

@@ -78,7 +78,7 @@ chown root:vhiti "$ENV_DIR/vhiti.env"
 
 sudo -u vhiti python3 -m venv "$APP_DIR/.venv"
 sudo -u vhiti "$APP_DIR/.venv/bin/pip" install --disable-pip-version-check -r "$APP_DIR/requirements.txt"
-sudo -u vhiti sh -c "cd \"$APP_DIR\" && FLASK_APP=wsgi.py $APP_DIR/.venv/bin/flask db upgrade"
+sudo -u vhiti bash -c "cd '$APP_DIR' && set -a && . '$ENV_DIR/vhiti.env' && set +a && .venv/bin/flask --app wsgi.py db upgrade"
 install -m 644 "$APP_DIR/deploy/vhiti.service" /etc/systemd/system/vhiti.service
 systemctl daemon-reload
 systemctl enable --now vhiti
