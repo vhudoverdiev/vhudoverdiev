@@ -24,7 +24,7 @@ bash deploy/setup_server.sh
 certbot --nginx -d vhudoverdiev.ru
 ```
 
-Старый сайт и его данные остаются на сервере до проверки резервной копии и переключения домена. Приложение использует отдельную базу `vhiti`.
+После запуска нового сайта и проверки домена удалите прежний проект командой `bash deploy/cleanup_legacy.sh`. Скрипт сначала проверяет новый `vhiti` и его HTTP-ответ; при ошибке старый сайт не трогает. Затем удаляет старый Gunicorn, Nginx-сайт `peredacha`, базу `peredacha`, каталог `/opt/peredacha` и старый сертификат `akvilon-peredacha.ru`. Снимок конфигурации Nginx/systemd сохраняется в root-only каталоге `/root/legacy-nginx-config-*`. Новая база отдельная: `vhiti`.
 
 ## Автоматический деплой из GitHub
 
