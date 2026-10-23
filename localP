@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+
+PROJECT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+cd "$PROJECT_DIR"
+
+if [ -f .venv/bin/activate ]; then
+    . .venv/bin/activate
+fi
+
+if ! python -c 'import flask' >/dev/null 2>&1; then
+    printf '%s\n' 'Flask не установлен в активном Python-окружении.' 'Установите зависимости командой: python3 -m pip install -r requirements.txt' >&2
+    exit 1
+fi
+
+export FLASK_APP=wsgi.py
+export FLASK_DEBUG=${FLASK_DEBUG:-1}
+
+printf '%s\n' 'Войти в IT запускается на http://127.0.0.1:5000' 'Остановить сервер: Ctrl+C'
+exec python -m flask run --host 127.0.0.1 --port "${PORT:-5000}"
