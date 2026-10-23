@@ -71,13 +71,13 @@ def create_app(config_class=Config):
 
     @app.cli.command("import-courses")
     @click.option("--root", default=None, help="Папка с материалами Курсы/1…4")
-    @click.option("--courses", default="1 2 3 4", help="Номера папок курсов для импорта")
+    @click.option("--course", "selected_courses", multiple=True, type=click.Choice(["1", "2", "3", "4"]), help="Номер папки курса для импорта; можно указать несколько раз")
     @with_appcontext
-    def import_courses(root, courses):
+    def import_courses(root, selected_courses):
         """Import selected prepared course folders into the catalog."""
         from .course_importer import import_course_folders
         source = root or os.path.join(app.instance_path, "media", "courses")
-        summary = import_course_folders(source, courses.split())
+        summary = import_course_folders(source, selected_courses or ("1", "2", "3", "4"))
         click.echo(summary)
 
     @app.errorhandler(403)

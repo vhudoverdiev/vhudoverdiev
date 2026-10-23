@@ -70,7 +70,9 @@ foreach id [split $course_ids " "] {
   }
 }
 
-set remote "bash /opt/vhiti/deploy/release.sh && chown -R vhiti:vhiti /opt/vhiti/instance/media/courses && sudo -u vhiti bash -lc 'cd /opt/vhiti && set -a && . /etc/vhiti/vhiti.env && set +a && .venv/bin/flask --app wsgi.py import-courses --root /opt/vhiti/instance/media/courses --courses=$course_ids'"
+set course_args ""
+foreach id [split $course_ids " "] { append course_args " --course $id" }
+set remote "bash /opt/vhiti/deploy/release.sh && chown -R vhiti:vhiti /opt/vhiti/instance/media/courses && sudo -u vhiti bash -lc 'cd /opt/vhiti && set -a && . /etc/vhiti/vhiti.env && set +a && .venv/bin/flask --app wsgi.py import-courses --root /opt/vhiti/instance/media/courses$course_args'"
 puts "Публикую обновление и импортирую курсы $course_ids."
 spawn ssh -S $socket -o BatchMode=yes $host $remote
 expect eof
