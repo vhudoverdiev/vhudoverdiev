@@ -13,6 +13,7 @@ from .extensions import csrf, db, login_manager, migrate
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+    app.config.setdefault("MEDIA_ROOT", os.path.join(app.instance_path, "media"))
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)
@@ -27,6 +28,7 @@ def create_app(config_class=Config):
     app.context_processor(lambda: {"now": datetime.now})
 
     os.makedirs(app.instance_path, exist_ok=True)
+    os.makedirs(app.config["MEDIA_ROOT"], exist_ok=True)
     handler = RotatingFileHandler(os.path.join(app.instance_path, "viti.log"), maxBytes=1_000_000, backupCount=3)
     handler.setLevel(logging.INFO)
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
@@ -66,6 +68,16 @@ def create_app(config_class=Config):
         db.session.add_all(demo)
         db.session.commit()
         click.echo("Добавлены демо-курсы. Замените их реальными материалами перед запуском.")
+
+    @app.cli.command("import-courses")
+    @click.option("--root", default=None, help="Папка с материалами Курсы/1…4")
+    @with_appcontext
+    def import_courses(root):
+        """Import the four prepared course folders into the catalog."""
+        from .course_importer import import_course_folders
+        source = root or os.path.join(app.instance_path, "media", "courses")
+        summary = import_course_folders(source)
+        click.echo(summary)
 
     @app.errorhandler(403)
     def forbidden(_error):

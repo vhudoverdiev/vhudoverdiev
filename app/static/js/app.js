@@ -38,4 +38,26 @@
       button.setAttribute('aria-label', visible ? 'Скрыть пароль' : 'Показать пароль');
     });
   });
+
+  document.querySelectorAll('video[data-progress-url]').forEach((video) => {
+    let lastSent = -1;
+    const saveProgress = () => {
+      if (!Number.isFinite(video.duration) || video.duration <= 0) return;
+      const percent = Math.min(100, Math.floor((video.currentTime / video.duration) * 100));
+      if (percent < 1 || (percent < 90 && percent - lastSent < 5) || percent <= lastSent) return;
+      lastSent = percent;
+      const data = new URLSearchParams({
+        watched_percent: String(percent),
+        csrf_token: document.querySelector('meta[name="csrf-token"]')?.content || '',
+      });
+      fetch(video.dataset.progressUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        body: data,
+      }).catch(() => { lastSent = Math.min(lastSent, percent - 5); });
+    };
+    video.addEventListener('timeupdate', saveProgress);
+    video.addEventListener('ended', saveProgress);
+  });
 })();

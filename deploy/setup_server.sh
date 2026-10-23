@@ -92,4 +92,4 @@ ufw allow 'Nginx Full' 2>/dev/null || true
 printf '\nInitial HTTP setup is complete. Backup: %s\n' "$BACKUP_DIR"
 printf 'Create the first admin: sudo -u vhiti bash -lc "cd %s && set -a && . %s/vhiti.env && set +a && .venv/bin/flask --app wsgi.py create-admin"\n' "$APP_DIR" "$ENV_DIR"
 printf 'After DNS points to this server, enable TLS: certbot --nginx -d %s\n' "$DOMAIN"
-printf 'For GitHub Actions deployment, configure a restricted SSH key and secrets SERVER_HOST, SERVER_USER, SERVER_SSH_KEY, SERVER_KNOWN_HOSTS.\n'
+printf 'For deployment and course upload, run pdeploy from the configured Mac terminal.\n'

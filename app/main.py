@@ -1,8 +1,11 @@
-from flask import Blueprint, abort, flash, redirect, render_template, url_for
+from datetime import datetime
+
+from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, send_from_directory, url_for
 from flask_login import current_user, login_required
+from werkzeug.utils import safe_join
 
 from .forms import AdminUserForm, CourseForm, LessonForm
-from .models import Course, Lesson, User
+from .models import Course, Lesson, LessonProgress, QuizAttempt, User
 from .services.course_service import create_course, published_courses
 import secrets
 
@@ -33,7 +36,91 @@ def courses():
 @login_required
 def course_detail(course_id):
     course = Course.query.filter_by(id=course_id, published=True).first_or_404()
-    return render_template("course_detail.html", course=course)
+    progress = {item.lesson_id: item for item in LessonProgress.query.filter_by(user_id=current_user.id).join(Lesson).filter(Lesson.course_id == course.id).all()}
+    attempts = {}
+    for item in QuizAttempt.query.filter_by(user_id=current_user.id).join(Lesson).filter(Lesson.course_id == course.id).order_by(QuizAttempt.created_at.desc()).all():
+        attempts.setdefault(item.lesson_id, item)
+    return render_template("course_detail.html", course=course, progress=progress, attempts=attempts)
+
+
+@bp.get("/courses/<int:course_id>/lessons/<int:lesson_id>")
+@login_required
+def lesson_detail(course_id, lesson_id):
+    course = Course.query.filter_by(id=course_id, published=True).first_or_404()
+    lesson = Lesson.query.filter_by(id=lesson_id, course_id=course.id).first_or_404()
+    progress = LessonProgress.query.filter_by(user_id=current_user.id, lesson_id=lesson.id).first()
+    attempt = None if request.args.get("retake") == "1" else QuizAttempt.query.filter_by(user_id=current_user.id, lesson_id=lesson.id).order_by(QuizAttempt.created_at.desc()).first()
+    previous = Lesson.query.filter_by(course_id=course.id).filter(Lesson.position < lesson.position).order_by(Lesson.position.desc()).first()
+    following = Lesson.query.filter_by(course_id=course.id).filter(Lesson.position > lesson.position).order_by(Lesson.position.asc()).first()
+    return render_template("lesson_detail.html", course=course, lesson=lesson, progress=progress, attempt=attempt, previous=previous, following=following)
+
+
+@bp.get("/media/<path:filename>")
+@login_required
+def media_file(filename):
+    media_root = current_app.config.get("MEDIA_ROOT", safe_join(current_app.instance_path, "media"))
+    if not Lesson.query.join(Course).filter(Lesson.video_url == f"local:{filename}", Course.published.is_(True)).first():
+        abort(404)
+    return send_from_directory(media_root, filename, conditional=True, max_age=0)
+
+
+@bp.get("/lessons/<int:lesson_id>/resources/<path:filename>")
+@login_required
+def lesson_resource(lesson_id, filename):
+    lesson = Lesson.query.join(Course).filter(Lesson.id == lesson_id, Course.published.is_(True)).first_or_404()
+    if not any(resource.get("path") == filename for resource in (lesson.resources_json or [])):
+        abort(404)
+    media_root = current_app.config.get("MEDIA_ROOT", safe_join(current_app.instance_path, "media"))
+    return send_from_directory(media_root, filename, as_attachment=True, conditional=True)
+
+
+@bp.post("/lessons/<int:lesson_id>/progress")
+@login_required
+def update_lesson_progress(lesson_id):
+    lesson = Lesson.query.join(Course).filter(Lesson.id == lesson_id, Course.published.is_(True)).first_or_404()
+    try:
+        watched = max(0, min(100, int(request.form.get("watched_percent", "0"))))
+    except ValueError:
+        abort(400)
+    progress = LessonProgress.query.filter_by(user_id=current_user.id, lesson_id=lesson.id).first()
+    if progress is None:
+        progress = LessonProgress(user_id=current_user.id, lesson_id=lesson.id)
+        from .extensions import db
+        db.session.add(progress)
+    progress.watched_percent = max(progress.watched_percent, watched)
+    progress.completed = progress.completed or watched >= 90
+    progress.updated_at = datetime.utcnow()
+    from .extensions import db
+    db.session.commit()
+    return "", 204
+
+
+@bp.post("/lessons/<int:lesson_id>/quiz")
+@login_required
+def submit_lesson_quiz(lesson_id):
+    lesson = Lesson.query.join(Course).filter(Lesson.id == lesson_id, Course.published.is_(True)).first_or_404()
+    questions = lesson.quiz_data or []
+    if not questions or lesson.course.course_type == "library":
+        abort(404)
+    answers = []
+    score = 0
+    for index, question in enumerate(questions):
+        try:
+            selected = int(request.form.get(f"question-{index}", "-1"))
+        except ValueError:
+            selected = -1
+        if selected < 0 or selected >= len(question["options"]):
+            flash("Ответьте на все вопросы перед отправкой.", "error")
+            return redirect(url_for("main.lesson_detail", course_id=lesson.course_id, lesson_id=lesson.id, _anchor="lesson-quiz"))
+        correct = selected == int(question["correct"])
+        score += int(correct)
+        answers.append({"selected": selected, "correct": correct})
+    attempt = QuizAttempt(user_id=current_user.id, lesson_id=lesson.id, score=score, question_count=len(questions), answers_json=answers)
+    from .extensions import db
+    db.session.add(attempt)
+    db.session.commit()
+    flash(f"Результат: {score} из {len(questions)}. Попытка сохранена в прогрессе.", "success" if score == len(questions) else "info")
+    return redirect(url_for("main.lesson_detail", course_id=lesson.course_id, lesson_id=lesson.id, _anchor="lesson-quiz"))
 
 
 @bp.route("/admin/courses/new", methods=["GET", "POST"])
@@ -55,6 +142,29 @@ def admin_courses():
     if not current_user.is_admin:
         abort(403)
     return render_template("admin_courses.html", courses=Course.query.order_by(Course.created_at.desc()).all())
+
+
+@bp.get("/admin/analytics")
+@login_required
+def admin_analytics():
+    if not current_user.is_admin:
+        abort(403)
+    rows = []
+    for course in Course.query.order_by(Course.title).all():
+        lessons = [lesson for lesson in course.lessons if not lesson.quiz_data]
+        lesson_ids = [lesson.id for lesson in lessons]
+        progress_rows = LessonProgress.query.filter(LessonProgress.lesson_id.in_(lesson_ids)).all() if lesson_ids else []
+        attempts = QuizAttempt.query.join(Lesson).filter(Lesson.course_id == course.id).all()
+        students = {row.user_id for row in progress_rows} | {row.user_id for row in attempts}
+        rows.append({
+            "course": course,
+            "lesson_count": len(lessons),
+            "completed": sum(row.completed for row in progress_rows),
+            "active_students": len(students),
+            "attempt_count": len(attempts),
+            "average_score": round(100 * sum(row.score / row.question_count for row in attempts) / len(attempts)) if attempts else None,
+        })
+    return render_template("admin_analytics.html", rows=rows)
 
 
 @bp.route("/admin/courses/<int:course_id>/lessons/new", methods=["GET", "POST"])

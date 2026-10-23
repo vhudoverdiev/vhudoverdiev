@@ -1,0 +1,71 @@
+#!/usr/bin/expect -f
+set timeout -1
+set host [lindex $argv 0]
+set courses_dir [lindex $argv 1]
+set socket "/tmp/pdeploy-[pid]-[clock seconds]"
+
+proc handle_auth {host} {
+  expect {
+    -re {Are you sure you want to continue connecting} {
+      send -- "yes\r"
+      exp_continue
+    }
+    -re {(?i)password:\s*$} {
+      stty -echo
+      send_user "Пароль SSH для $host: "
+      expect_user -re "(.*)\n"
+      stty echo
+      send -- "$expect_out(1,string)\r"
+      send_user "\n"
+      exp_continue
+    }
+    eof {}
+  }
+  catch wait result
+  return [lindex $result 3]
+}
+
+puts "Подключаюсь к $host. При первом соединении сверяйте ключ сервера перед подтверждением."
+spawn ssh -M -S $socket -o ControlPersist=no -o PreferredAuthentications=keyboard-interactive,password -o PubkeyAuthentication=no -o StrictHostKeyChecking=ask -fN $host
+if {[handle_auth $host] != 0} {
+  puts stderr "Не удалось установить SSH-соединение."
+  exit 1
+}
+
+set preflight {set -eu; avail=$(df -PB1 /opt/vhiti | awk 'NR==2 {print $4}'); marker=/opt/vhiti/instance/media/courses/.pdeploy-upload-started; if [ ! -e "$marker" ] && [ "$avail" -lt 53687091200 ]; then echo "На сервере меньше 50 ГБ свободного места: ${avail} bytes. Курсы не загружены."; exit 42; fi; mkdir -p /opt/vhiti/instance/media/courses; touch "$marker"; if ! command -v rsync >/dev/null 2>&1; then apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y rsync; fi; echo "Свободного места: $((avail / 1073741824)) GiB."}
+spawn ssh -S $socket -o BatchMode=yes $host $preflight
+expect {
+  -re {На сервере меньше 50 ГБ свободного места} { puts stderr $expect_out(0,string); exp_continue }
+  eof {}
+}
+catch wait result
+if {[lindex $result 3] != 0} {
+  spawn ssh -S $socket -o BatchMode=yes $host "true"
+  expect eof
+  catch {exec ssh -S $socket -O exit $host}
+  exit 1
+}
+
+puts "Передаю папку курсов. Объём около 41 ГБ; rsync покажет прогресс и продолжит неполную передачу при повторном запуске."
+spawn rsync -a --partial --progress --exclude=.DS_Store -e "ssh -S $socket -o BatchMode=yes" "$courses_dir/" "$host:/opt/vhiti/instance/media/courses/"
+expect {
+  -re {Permission denied|Connection .* closed|No space left on device|rsync error} { puts stderr $expect_out(0,string); exp_continue }
+  eof {}
+}
+catch wait result
+if {[lindex $result 3] != 0} {
+  puts stderr "Передача материалов не завершилась. Повторите pdeploy: rsync продолжит загрузку."
+  spawn ssh -S $socket -o BatchMode=yes $host "true"
+  expect eof
+  catch {exec ssh -S $socket -O exit $host}
+  exit 1
+}
+
+set remote {bash /opt/vhiti/deploy/release.sh && chown -R vhiti:vhiti /opt/vhiti/instance/media/courses && sudo -u vhiti bash -lc 'cd /opt/vhiti && set -a && . /etc/vhiti/vhiti.env && set +a && .venv/bin/flask --app wsgi.py import-courses --root /opt/vhiti/instance/media/courses'}
+puts "Публикую обновление и импортирую четыре курса."
+spawn ssh -S $socket -o BatchMode=yes $host $remote
+expect eof
+catch wait result
+set exit_code [lindex $result 3]
+catch {exec ssh -S $socket -O exit $host}
+exit $exit_code

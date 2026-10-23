@@ -1,0 +1,39 @@
+#!/bin/sh
+set -eu
+
+PROJECT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+COURSES_DIR=${PDEPLOY_COURSES_DIR:-"/Users/khudoverdiev/Desktop/Сайты/vhudoverdiev/Курсы"}
+HOST=${PDEPLOY_HOST:-135.106.139.229}
+USER=${PDEPLOY_USER:-root}
+
+cd "$PROJECT_DIR"
+
+if ! command -v expect >/dev/null 2>&1; then
+  printf '%s\n' 'Для парольного SSH-ввода нужен expect. Установите: brew install expect' >&2
+  exit 1
+fi
+if ! command -v rsync >/dev/null 2>&1; then
+  printf '%s\n' 'Не найден rsync. Установите его перед загрузкой курсов.' >&2
+  exit 1
+fi
+if [ ! -d "$COURSES_DIR/1" ] || [ ! -d "$COURSES_DIR/2" ] || [ ! -d "$COURSES_DIR/3" ] || [ ! -d "$COURSES_DIR/4" ]; then
+  printf 'Не найдены папки 1–4 курсов: %s\nПуть можно задать через PDEPLOY_COURSES_DIR.\n' "$COURSES_DIR" >&2
+  exit 1
+fi
+
+git add -A
+if ! git diff --cached --quiet; then
+  git commit -m "Add course library and learning checks"
+fi
+if [ -n "$(git status --porcelain --untracked-files=normal)" ]; then
+  printf '%s\n' 'Остались незакоммиченные файлы. Проверьте git status.' >&2
+  exit 1
+fi
+BRANCH=$(git branch --show-current)
+if [ "$BRANCH" != main ]; then
+  printf 'Текущая ветка: %s. pdeploy отправляет изменения только из main.\n' "$BRANCH" >&2
+  exit 1
+fi
+
+git push origin main
+exec expect deploy/pdeploy.expect "$USER@$HOST" "$COURSES_DIR"

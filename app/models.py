@@ -31,6 +31,7 @@ class Course(db.Model):
     icon = db.Column(db.String(8), nullable=False, default="✳")
     color = db.Column(db.String(20), nullable=False, default="lime")
     published = db.Column(db.Boolean, default=False, nullable=False)
+    course_type = db.Column(db.String(20), default="course", nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     lessons = db.relationship("Lesson", backref="course", cascade="all, delete-orphan", order_by="Lesson.position")
 
@@ -42,6 +43,29 @@ class Lesson(db.Model):
     video_url = db.Column(db.String(500))
     content = db.Column(db.Text, nullable=False, default="")
     position = db.Column(db.Integer, nullable=False, default=0)
+    module_name = db.Column(db.String(180), nullable=False, default="")
+    quiz_data = db.Column(db.JSON)
+    resources_json = db.Column(db.JSON)
+
+
+class LessonProgress(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    lesson_id = db.Column(db.Integer, db.ForeignKey("lesson.id"), nullable=False, index=True)
+    watched_percent = db.Column(db.Integer, nullable=False, default=0)
+    completed = db.Column(db.Boolean, nullable=False, default=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    __table_args__ = (db.UniqueConstraint("user_id", "lesson_id", name="uq_lesson_progress_user_lesson"),)
+
+
+class QuizAttempt(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    lesson_id = db.Column(db.Integer, db.ForeignKey("lesson.id"), nullable=False, index=True)
+    score = db.Column(db.Integer, nullable=False)
+    question_count = db.Column(db.Integer, nullable=False)
+    answers_json = db.Column(db.JSON, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
 
 @login_manager.user_loader

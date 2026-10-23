@@ -5,3 +5,6 @@ __pycache__/
 instance/
 .pytest_cache/
 .coverage
+Курсы/
+.DS_Store
+**/.DS_Store

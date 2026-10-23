@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block title %}{{ lesson.title }} · {{ course.title }}{% endblock %}
+{% block body_class %}app-body{% endblock %}
+{% block content %}
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <a class="brand brand-light" href="{{ url_for('main.dashboard') }}"><span class="brand-mark">В</span><span>Войти в IT</span></a>
+    <div class="side-label">ОБУЧЕНИЕ</div>
+    <nav class="side-nav"><a class="side-link" href="{{ url_for('main.dashboard') }}"><span class="nav-icon">▦</span>Обзор</a><a class="side-link active" href="{{ url_for('main.courses') }}"><span class="nav-icon">◫</span>Каталог курсов</a></nav>
+  </aside>
+  <main class="main-area">
+    <header class="topbar"><button class="mobile-menu icon-btn" aria-label="Открыть меню">☰</button><div class="breadcrumb"><a href="{{ url_for('main.course_detail', course_id=course.id) }}">{{ course.title }}</a><span>/</span><strong>{{ lesson.module_name }}</strong></div><div class="topbar-right"><span class="top-avatar">{{ current_user.name[:1]|upper }}</span></div></header>
+    <div class="page-content lesson-page">
+      <a class="back-link" href="{{ url_for('main.course_detail', course_id=course.id) }}">← К программе курса</a>
+      <div class="lesson-heading"><span class="eyebrow muted-eyebrow">{{ lesson.module_name }}</span><h1>{{ lesson.title }}</h1></div>
+      {% if lesson.video_url and lesson.video_url.startswith('local:') %}
+      <div class="video-frame"><video controls playsinline preload="metadata" data-progress-url="{{ url_for('main.update_lesson_progress', lesson_id=lesson.id) }}"><source src="{{ url_for('main.media_file', filename=lesson.video_url[6:]) }}" type="video/mp4">Ваш браузер не поддерживает воспроизведение видео.</video></div>
+      {% elif lesson.content %}<article class="lesson-reading">{{ lesson.content }}</article>
+      {% endif %}
+      {% if not lesson.quiz_data and not lesson.video_url %}
+      <form method="post" action="{{ url_for('main.update_lesson_progress', lesson_id=lesson.id) }}" class="reading-complete-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="watched_percent" value="100"><button class="button-dark" type="submit">{% if progress and progress.completed %}Материал пройден ✓{% else %}Отметить материал пройденным{% endif %}</button></form>
+      {% endif %}
+      {% if lesson.resources_json %}
+      <section class="lesson-resources"><div class="eyebrow muted-eyebrow">МАТЕРИАЛЫ К УРОКУ</div><div class="resource-list">
+        {% for resource in lesson.resources_json %}<a href="{{ url_for('main.lesson_resource', lesson_id=lesson.id, filename=resource.path) }}" download><span>↧</span>{{ resource.name }}</a>{% endfor %}
+      </div></section>
+      {% endif %}
+      {% if lesson.quiz_data %}
+      <section class="quiz-panel" id="lesson-quiz"><div class="eyebrow muted-eyebrow">ПРОВЕРКА ЗНАНИЙ</div><h2>Закрепим тему</h2>
+        {% if attempt %}<p class="quiz-last-result">Последняя попытка: <strong>{{ attempt.score }} из {{ attempt.question_count }}</strong></p>{% endif %}
+        <form method="post" action="{{ url_for('main.submit_lesson_quiz', lesson_id=lesson.id) }}" class="quiz-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% for question in lesson.quiz_data %}
+          {% set question_index = loop.index0 %}
+          <fieldset class="quiz-question"><legend>{{ loop.index }}. {{ question.prompt }}</legend>
+            {% set answer = attempt.answers_json[question_index] if attempt else none %}
+            {% for option in question.options %}<label class="quiz-option{% if attempt and loop.index0 == question.correct %} quiz-option-correct{% elif attempt and answer.selected == loop.index0 %} quiz-option-wrong{% endif %}"><input type="radio" name="question-{{ question_index }}" value="{{ loop.index0 }}" {% if answer and answer.selected == loop.index0 %}checked{% endif %} required {% if attempt %}disabled{% endif %}><span>{{ option }}</span>{% if attempt and loop.index0 == question.correct %}<strong class="answer-mark">Верно</strong>{% endif %}</label>{% endfor %}
+            {% if attempt %}<p class="quiz-explanation"><strong>Разбор:</strong> {{ question.explanation }}</p>{% endif %}
+          </fieldset>
+          {% endfor %}
+          {% if not attempt %}<button class="button-dark" type="submit">Проверить ответы <span>↗</span></button>{% else %}<a class="button-dark" href="{{ url_for('main.lesson_detail', course_id=course.id, lesson_id=lesson.id, retake=1, _anchor='lesson-quiz') }}">Пройти ещё раз <span>↻</span></a>{% endif %}
+        </form>
+      </section>
+      {% endif %}
+      <nav class="lesson-pager" aria-label="Навигация по урокам">
+        {% if previous %}<a class="text-link" href="{{ url_for('main.lesson_detail', course_id=course.id, lesson_id=previous.id) }}">← {{ previous.title }}</a>{% else %}<span></span>{% endif %}
+        {% if following %}<a class="button-dark" href="{{ url_for('main.lesson_detail', course_id=course.id, lesson_id=following.id) }}">Следующий урок <span>→</span></a>{% endif %}
+      </nav>
+    </div>
+  </main>
+</div>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block title %}Аналитика обучения{% endblock %}
+{% block body_class %}app-body{% endblock %}
+{% block content %}
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"><a class="brand brand-light" href="{{ url_for('main.dashboard') }}"><span class="brand-mark">В</span><span>Войти в IT</span></a><div class="side-label">АДМИНИСТРИРОВАНИЕ</div><nav class="side-nav"><a class="side-link" href="{{ url_for('main.admin_courses') }}"><span class="nav-icon">＋</span>Курсы</a><a class="side-link active" href="{{ url_for('main.admin_analytics') }}"><span class="nav-icon">◷</span>Аналитика</a><a class="side-link" href="{{ url_for('main.new_user') }}"><span class="nav-icon">♙</span>Создать ученика</a></nav></aside>
+  <main class="main-area"><header class="topbar"><button class="mobile-menu icon-btn" aria-label="Открыть меню">☰</button><div class="breadcrumb"><a href="{{ url_for('main.admin_courses') }}">Управление</a><span>/</span><strong>Аналитика</strong></div></header>
+    <div class="page-content"><section class="admin-head"><span class="eyebrow muted-eyebrow">ПРОГРЕСС И РЕЗУЛЬТАТЫ</span><h1>Аналитика обучения</h1><p>Просмотры уроков и последние результаты тестов учеников.</p></section>
+      <div class="admin-table-wrap analytics-table"><div class="admin-table-head"><span>КУРС</span><span>УРОКИ</span><span>ЗАВЕРШЕНО</span><span>УЧЕНИКИ</span><span>ПОПЫТКИ ТЕСТОВ</span><span>СРЕДНИЙ РЕЗУЛЬТАТ</span></div>
+      {% for row in rows %}<div class="admin-table-row"><div class="admin-course-name"><span class="course-icon {{ row.course.color }}">{{ row.course.icon }}</span><div><strong>{{ row.course.title }}</strong><small>{{ row.course.category }}</small></div></div><span>{{ row.lesson_count }}</span><span>{{ row.completed }}</span><span>{{ row.active_students }}</span><span>{{ row.attempt_count }}</span><span>{{ (row.average_score|string + '%') if row.average_score is not none else '—' }}</span></div>{% else %}<div class="admin-empty"><h3>Пока нет курсов</h3></div>{% endfor %}</div>
+    </div>
+  </main>
+</div>
+{% endblock %}
