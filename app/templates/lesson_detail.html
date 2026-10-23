@@ -12,7 +12,7 @@
     <header class="topbar"><button class="mobile-menu icon-btn" aria-label="Открыть меню">☰</button><div class="breadcrumb"><a href="{{ url_for('main.course_detail', course_id=course.id) }}">{{ course.title }}</a><span>/</span><strong>{{ lesson.module_name }}</strong></div><div class="topbar-right"><span class="top-avatar">{{ current_user.name[:1]|upper }}</span></div></header>
     <div class="page-content lesson-page">
       <a class="back-link" href="{{ url_for('main.course_detail', course_id=course.id) }}">← К программе курса</a>
-      <div class="lesson-heading"><span class="eyebrow muted-eyebrow">{{ lesson.module_name }}</span><h1>{{ lesson.title }}</h1></div>
+      <div class="lesson-heading"><div><span class="eyebrow muted-eyebrow">{{ lesson.module_name }}</span><h1>{{ lesson.title }}</h1></div><span class="lesson-course-tag">{{ course.title }}</span></div>
       {% if lesson.video_url and lesson.video_url.startswith('local:') %}
       <div class="video-frame"><video controls playsinline preload="metadata" data-progress-url="{{ url_for('main.update_lesson_progress', lesson_id=lesson.id) }}"><source src="{{ url_for('main.media_file', filename=lesson.video_url[6:]) }}" type="video/mp4">Ваш браузер не поддерживает воспроизведение видео.</video></div>
       {% elif lesson.content %}<article class="lesson-reading">{{ lesson.content }}</article>
@@ -25,12 +25,13 @@
         {% for resource in lesson.resources_json %}<a href="{{ url_for('main.lesson_resource', lesson_id=lesson.id, filename=resource.path) }}" download><span>↧</span>{{ resource.name }}</a>{% endfor %}
       </div></section>
       {% endif %}
-      {% if lesson.quiz_data %}
-      <section class="quiz-panel" id="lesson-quiz"><div class="eyebrow muted-eyebrow">ПРОВЕРКА ЗНАНИЙ</div><h2>Закрепим тему</h2>
+      {% if quiz_questions %}
+      <section class="quiz-panel" id="lesson-quiz"><div class="quiz-panel-heading"><span class="quiz-panel-icon">✓</span><div><div class="eyebrow muted-eyebrow">ПРОВЕРКА ЗНАНИЙ · {{ quiz_questions|length }} ВОПРОСА</div><h2>Закрепим тему</h2><p>Ответьте на вопросы по материалам этого раздела. Результат сохранится в вашем прогрессе.</p></div></div>
         {% if attempt %}<p class="quiz-last-result">Последняя попытка: <strong>{{ attempt.score }} из {{ attempt.question_count }}</strong></p>{% endif %}
-        <form method="post" action="{{ url_for('main.submit_lesson_quiz', lesson_id=lesson.id) }}" class="quiz-form">
+        <form method="post" action="{{ url_for('main.submit_lesson_quiz', lesson_id=quiz_lesson.id) }}" class="quiz-form">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          {% for question in lesson.quiz_data %}
+          <input type="hidden" name="return_lesson_id" value="{{ lesson.id }}">
+          {% for question in quiz_questions %}
           {% set question_index = loop.index0 %}
           <fieldset class="quiz-question"><legend>{{ loop.index }}. {{ question.prompt }}</legend>
             {% set answer = attempt.answers_json[question_index] if attempt else none %}

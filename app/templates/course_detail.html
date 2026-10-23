@@ -36,8 +36,10 @@
         {% for module, lessons in course.lessons|groupby('module_name') %}
         <details class="module-card" {% if loop.first %}open{% endif %}>
           <summary><span><small>ТЕМА {{ '%02d'|format(loop.index) }}</small><strong>{{ module or 'Материалы курса' }}</strong></span><span class="module-count">{{ lessons|length }} <span>материалов</span>⌄</span></summary>
+          {% set topic_lessons = lessons|rejectattr('quiz_data')|list %}
+          {% set topic_quiz = lessons|selectattr('quiz_data')|first %}
           <div class="module-lessons">
-            {% for lesson in lessons %}
+            {% for lesson in topic_lessons %}
             <article class="module-lesson" id="lesson-{{ lesson.id }}">
               <span class="lesson-num">{{ '%02d'|format(loop.index) }}</span>
               <div class="module-lesson-copy"><h3>{{ lesson.title }}</h3>
@@ -45,9 +47,16 @@
                 {% elif lesson.video_url %}<p>Видеоурок{% if progress.get(lesson.id) and progress.get(lesson.id).completed %} · просмотрено{% endif %}</p>
                 {% else %}<p>Материал для чтения</p>{% endif %}
               </div>
-              <a class="button-dark lesson-open" href="{{ url_for('main.lesson_detail', course_id=course.id, lesson_id=lesson.id) }}">{{ 'Пройти' if lesson.quiz_data else 'Открыть' }} <span>↗</span></a>
+              <a class="button-dark lesson-open" href="{{ url_for('main.lesson_detail', course_id=course.id, lesson_id=lesson.id) }}">Открыть <span>↗</span></a>
             </article>
             {% endfor %}
+            {% if topic_quiz and topic_lessons %}
+            <article class="module-quiz-row">
+              <span class="module-quiz-icon" aria-hidden="true">✓</span>
+              <div><strong>Проверка знаний</strong><p>{{ topic_quiz.quiz_data|length }} вопроса · появится под последним уроком темы</p></div>
+              <a href="{{ url_for('main.lesson_detail', course_id=course.id, lesson_id=topic_lessons[-1].id, _anchor='lesson-quiz') }}">К тесту <span>→</span></a>
+            </article>
+            {% endif %}
           </div>
         </details>
         {% endfor %}

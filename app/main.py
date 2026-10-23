@@ -49,10 +49,18 @@ def lesson_detail(course_id, lesson_id):
     course = Course.query.filter_by(id=course_id, published=True).first_or_404()
     lesson = Lesson.query.filter_by(id=lesson_id, course_id=course.id).first_or_404()
     progress = LessonProgress.query.filter_by(user_id=current_user.id, lesson_id=lesson.id).first()
-    attempt = None if request.args.get("retake") == "1" else QuizAttempt.query.filter_by(user_id=current_user.id, lesson_id=lesson.id).order_by(QuizAttempt.created_at.desc()).first()
+    module_quiz = None
+    if not lesson.quiz_data:
+        module_quiz = Lesson.query.filter_by(course_id=course.id, module_name=lesson.module_name).filter(Lesson.quiz_data.isnot(None)).first()
+        last_module_lesson = Lesson.query.filter_by(course_id=course.id, module_name=lesson.module_name).filter(Lesson.quiz_data.is_(None)).order_by(Lesson.position.desc()).first()
+        if not last_module_lesson or last_module_lesson.id != lesson.id:
+            module_quiz = None
+    quiz_lesson = lesson if lesson.quiz_data else module_quiz
+    quiz_questions = quiz_lesson.quiz_data if quiz_lesson else None
+    attempt = None if request.args.get("retake") == "1" or not quiz_lesson else QuizAttempt.query.filter_by(user_id=current_user.id, lesson_id=quiz_lesson.id).order_by(QuizAttempt.created_at.desc()).first()
     previous = Lesson.query.filter_by(course_id=course.id).filter(Lesson.position < lesson.position).order_by(Lesson.position.desc()).first()
     following = Lesson.query.filter_by(course_id=course.id).filter(Lesson.position > lesson.position).order_by(Lesson.position.asc()).first()
-    return render_template("lesson_detail.html", course=course, lesson=lesson, progress=progress, attempt=attempt, previous=previous, following=following)
+    return render_template("lesson_detail.html", course=course, lesson=lesson, progress=progress, attempt=attempt, previous=previous, following=following, quiz_lesson=quiz_lesson, quiz_questions=quiz_questions)
 
 
 @bp.get("/media/<path:filename>")
@@ -102,6 +110,8 @@ def submit_lesson_quiz(lesson_id):
     questions = lesson.quiz_data or []
     if not questions or lesson.course.course_type == "library":
         abort(404)
+    return_lesson = Lesson.query.filter_by(id=request.form.get("return_lesson_id", type=int), course_id=lesson.course_id).first()
+    return_lesson = return_lesson or lesson
     answers = []
     score = 0
     for index, question in enumerate(questions):
@@ -111,7 +121,7 @@ def submit_lesson_quiz(lesson_id):
             selected = -1
         if selected < 0 or selected >= len(question["options"]):
             flash("Ответьте на все вопросы перед отправкой.", "error")
-            return redirect(url_for("main.lesson_detail", course_id=lesson.course_id, lesson_id=lesson.id, _anchor="lesson-quiz"))
+            return redirect(url_for("main.lesson_detail", course_id=lesson.course_id, lesson_id=return_lesson.id, _anchor="lesson-quiz"))
         correct = selected == int(question["correct"])
         score += int(correct)
         answers.append({"selected": selected, "correct": correct})
@@ -120,7 +130,7 @@ def submit_lesson_quiz(lesson_id):
     db.session.add(attempt)
     db.session.commit()
     flash(f"Результат: {score} из {len(questions)}. Попытка сохранена в прогрессе.", "success" if score == len(questions) else "info")
-    return redirect(url_for("main.lesson_detail", course_id=lesson.course_id, lesson_id=lesson.id, _anchor="lesson-quiz"))
+    return redirect(url_for("main.lesson_detail", course_id=lesson.course_id, lesson_id=return_lesson.id, _anchor="lesson-quiz"))
 
 
 @bp.route("/admin/courses/new", methods=["GET", "POST"])
