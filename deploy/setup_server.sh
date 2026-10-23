@@ -38,8 +38,24 @@ id -u vhiti >/dev/null 2>&1 || useradd --system --home "$APP_DIR" --shell /usr/s
 install -d -o vhiti -g vhiti "$APP_DIR/instance"
 install -d -m 750 "$ENV_DIR"
 
+if [[ -e "$APP_DIR" && ! -d "$APP_DIR/.git" ]]; then
+  PREVIOUS_APP_DIR="${APP_DIR}.preexisting-${STAMP}"
+  mv "$APP_DIR" "$PREVIOUS_APP_DIR"
+  printf 'Moved pre-existing %s to %s
+' "$APP_DIR" "$PREVIOUS_APP_DIR"
+fi
 if [[ ! -d "$APP_DIR/.git" ]]; then
   git clone https://github.com/vhudoverdiev/vhudoverdiev.git "$APP_DIR"
+else
+  git -C "$APP_DIR" remote get-url origin | grep -q 'github.com/vhudoverdiev/vhudoverdiev' || {
+    PREVIOUS_APP_DIR="${APP_DIR}.preexisting-${STAMP}"
+    mv "$APP_DIR" "$PREVIOUS_APP_DIR"
+    printf 'Moved unrelated repository to %s
+' "$PREVIOUS_APP_DIR"
+    git clone https://github.com/vhudoverdiev/vhudoverdiev.git "$APP_DIR"
+  }
+  git -C "$APP_DIR" fetch origin main
+  git -C "$APP_DIR" reset --hard origin/main
 fi
 chown -R vhiti:vhiti "$APP_DIR"
 
