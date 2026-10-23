@@ -10,6 +10,11 @@ from .services.course_service import published_courses
 bp = Blueprint("main", __name__)
 
 
+@bp.get("/site.webmanifest")
+def web_manifest():
+    return send_from_directory(current_app.static_folder, "site.webmanifest", mimetype="application/manifest+json", max_age=3600)
+
+
 @bp.get("/apple-touch-icon.png")
 def apple_touch_icon():
     return send_from_directory(current_app.static_folder, "icons/icon-180.png", max_age=86400)
