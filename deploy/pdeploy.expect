@@ -39,7 +39,7 @@ if {[handle_auth $host] != 0} {
   exit 1
 }
 
-set preflight "set -eu; avail=\$(df -PB1 /opt/vhiti | awk 'NR==2 {print \$4}'); required=$required_bytes; if [ \$avail -lt \$required ]; then echo \"Недостаточно места для выбранных курсов: свободно \$((avail / 1073741824)) GiB, требуется примерно \$((required / 1073741824)) GiB с запасом. Курсы не загружены.\"; exit 42; fi; mkdir -p /opt/vhiti/instance/media/courses; if ! command -v rsync >/dev/null 2>&1; then apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y rsync; fi; echo \"Свободного места: \$((avail / 1073741824)) GiB; требуется с запасом: \$((required / 1073741824)) GiB.\""
+set preflight [format {set -eu; avail=$(df -PB1 /opt/vhiti | awk 'NR==2 {print $4}'); required=%d; if [ "$avail" -lt "$required" ]; then echo "Недостаточно места для выбранных курсов: свободно $((avail / 1073741824)) GiB, требуется примерно $((required / 1073741824)) GiB с запасом. Курсы не загружены."; exit 42; fi; mkdir -p /opt/vhiti/instance/media/courses; if ! command -v rsync >/dev/null 2>&1; then apt-get update; DEBIAN_FRONTEND=noninteractive apt-get install -y rsync; fi; echo "Свободного места: $((avail / 1073741824)) GiB; требуется с запасом: $((required / 1073741824)) GiB."} $required_bytes]
 spawn ssh -S $socket -o BatchMode=yes $host $preflight
 expect {
   -re {Недостаточно места для выбранных курсов} { puts stderr $expect_out(0,string); exp_continue }
