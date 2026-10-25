@@ -49,7 +49,21 @@ def course_detail(course_id):
     attempts = {}
     for item in QuizAttempt.query.filter_by(user_id=current_user.id).join(Lesson).filter(Lesson.course_id == course.id).order_by(QuizAttempt.created_at.desc()).all():
         attempts.setdefault(item.lesson_id, item)
-    return render_template("course_detail.html", course=course, progress=progress, attempts=attempts, lesson_states=course_states(course))
+    lesson_states = course_states(course)
+    ordered_lessons = sorted(
+        (lesson for lesson in course.lessons if not lesson.quiz_data),
+        key=lambda lesson: (lesson.position, lesson.id),
+    )
+    next_lesson = next(
+        (lesson for lesson in ordered_lessons
+         if lesson_states[lesson.id]["unlocked"] and not lesson_states[lesson.id]["completed"]),
+        ordered_lessons[-1] if ordered_lessons else None,
+    )
+    return render_template(
+        "course_detail.html", course=course, progress=progress, attempts=attempts,
+        lesson_states=lesson_states,
+        active_module=next_lesson.module_name if next_lesson else None,
+    )
 
 
 @bp.get("/courses/<int:course_id>/lessons/<int:lesson_id>")

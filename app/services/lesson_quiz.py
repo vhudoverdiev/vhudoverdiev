@@ -9,6 +9,10 @@ from .quiz_bank import facts_for
 def questions_for_lesson(lesson):
     if lesson.course.course_type == "library":
         return []
+    from .reviewed_quizzes import reviewed_questions
+    reviewed = reviewed_questions(lesson)
+    if reviewed is not None:
+        return reviewed
     if lesson.course.title.startswith('Английский') and not lesson.quiz_data:
         from pathlib import Path
         from .english_lesson_bank import LESSONS

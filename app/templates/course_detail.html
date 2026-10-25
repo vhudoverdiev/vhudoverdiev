@@ -35,7 +35,7 @@
       {% if course.lessons %}
       <div class="module-list">
         {% for module, lessons in course.lessons|groupby('module_name') %}
-        <details class="module-card" {% if loop.first %}open{% endif %}>
+        <details class="module-card" {% if module == active_module %}open{% endif %}>
           <summary><span><small>ТЕМА {{ '%02d'|format(loop.index) }}</small><strong>{{ module or 'Материалы курса' }}</strong></span><span class="module-count">{{ lessons|rejectattr('quiz_data')|list|length }} <span>материалов</span>{{ icon('chevron') }}</span></summary>
           {% set topic_lessons = lessons|rejectattr('quiz_data')|list %}
           {% set topic_quiz = lessons|selectattr('quiz_data')|first %}
