@@ -122,3 +122,7 @@ if (document.querySelector('[data-check-heading]')) {
   };
   window.addEventListener('pageshow', resetQuestionPosition);
 }
+
+document.querySelectorAll('[data-celebration]').forEach((stage) => {
+  window.setTimeout(() => stage.remove(), 5200);
+});

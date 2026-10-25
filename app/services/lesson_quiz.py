@@ -27,9 +27,7 @@ def questions_for_lesson(lesson):
                                   'options': options, 'correct': options.index(definition),
                                   'explanation': f'{term} — {definition[0].lower() + definition[1:]}.'})
             return questions
-    topic_check = lesson if lesson.quiz_data else Lesson.query.filter_by(
-        course_id=lesson.course_id, module_name=lesson.module_name
-    ).filter(Lesson.quiz_data.isnot(None)).order_by(Lesson.position).first()
+    topic_check = lesson if lesson.quiz_data else next((item for item in lesson.course.lessons if item.module_name == lesson.module_name and item.quiz_data), None)
     authored = list(topic_check.quiz_data or []) if topic_check else []
     title = lesson.course.title
     kind = 'ai' if title.startswith('AI Developer') else 'english' if title.startswith('Английский') else 'python' if title.startswith('Python:') else None

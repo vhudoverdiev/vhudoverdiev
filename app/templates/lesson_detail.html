@@ -13,13 +13,14 @@
     <header class="topbar"><button class="mobile-menu icon-btn" aria-label="Открыть меню">{{ icon('menu') }}</button><div class="breadcrumb"><a href="{{ url_for('main.course_detail', course_id=course.id) }}">{{ course.title }}</a><span>/</span><strong>{{ lesson.module_name }}</strong></div><div class="topbar-right"><span class="top-avatar">{{ current_user.name[:1]|upper }}</span></div></header>
     <div class="page-content lesson-page">
       <a class="back-link" href="{{ url_for('main.course_detail', course_id=course.id) }}">{{ icon('arrow-left') }} К программе курса</a>
+      <p class="lesson-page-status {{ 'is-done' if lesson_status.completed else '' }}">{{ icon('check') if lesson_status.completed else icon('book') }} {{ lesson_status.label }}</p>
       <div class="lesson-heading"><div><span class="eyebrow muted-eyebrow">{{ lesson.module_name }}</span><h1>{{ lesson.title }}</h1></div><span class="lesson-course-tag">{{ course.title }}</span></div>
       {% if lesson.video_url and lesson.video_url.startswith('local:') %}
       <div class="video-frame" aria-label="Видеоурок"><video controls playsinline preload="metadata" data-progress-url="{{ url_for('main.update_lesson_progress', lesson_id=lesson.id) }}"><source src="{{ url_for('main.media_file', filename=lesson.video_url[6:]) }}" type="video/mp4">Ваш браузер не поддерживает воспроизведение видео.</video></div><p class="player-caption" role="status">После просмотра — проверка знаний ниже {{ icon('chevron') }}</p>
       {% elif lesson.content %}<article class="lesson-reading">{{ lesson.content }}</article>
       {% endif %}
       {% if not lesson.quiz_data and not lesson.video_url %}
-      <form method="post" action="{{ url_for('main.update_lesson_progress', lesson_id=lesson.id) }}" class="reading-complete-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="watched_percent" value="100"><input type="hidden" name="return_to_lesson" value="1"><button class="button-dark" type="submit">{% if progress and progress.completed %}Материал пройден {{ icon('check') }}{% else %}Отметить материал пройденным{% endif %}</button></form>
+      <form method="post" action="{{ url_for('main.update_lesson_progress', lesson_id=lesson.id) }}" class="reading-complete-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="watched_percent" value="100"><input type="hidden" name="return_to_lesson" value="1"><button class="button-dark" type="submit">{% if progress and progress.watched_percent >= 90 %}Материал просмотрен {{ icon('check') }}{% else %}Отметить материал пройденным{% endif %}</button></form>
       {% endif %}
       {% if lesson.resources_json %}
       <section class="lesson-resources"><div class="eyebrow muted-eyebrow">МАТЕРИАЛЫ К УРОКУ</div><div class="resource-list">

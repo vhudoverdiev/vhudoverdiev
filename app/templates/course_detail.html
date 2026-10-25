@@ -26,7 +26,7 @@
         <div class="course-category">{{ course.category }}</div>
         <h1>{{ course.title }}</h1><p>{{ course.description }}</p>
         <div class="detail-meta"><span>{{ icon('clock') }} {{ course.duration }}</span><span>{{ icon('book') }} {{ course.lessons|rejectattr('quiz_data')|list|length }} материалов</span>{% if course.course_type != 'library' %}<span>{{ icon('check') }} Проверки знаний</span>{% endif %}</div>
-        {% set watched = progress.values()|selectattr('completed')|list|length %}
+        {% set watched = lesson_states.values()|selectattr('completed')|list|length %}
         <div class="course-progress-summary"><span>Завершено {{ watched }} из {{ course.lessons|rejectattr('quiz_data')|list|length }} уроков</span><span>{{ ((watched / (course.lessons|rejectattr('quiz_data')|list|length)) * 100)|round|int if course.lessons|rejectattr('quiz_data')|list|length else 0 }}%</span></div>
         <div class="progress-track"><i style="width:{{ ((watched / (course.lessons|rejectattr('quiz_data')|list|length)) * 100)|round|int if course.lessons|rejectattr('quiz_data')|list|length else 0 }}%"></i></div>
         <div class="detail-decor" aria-hidden="true">{{ course_icon(course) }}</div>
@@ -41,14 +41,13 @@
           {% set topic_quiz = lessons|selectattr('quiz_data')|first %}
           <div class="module-lessons">
             {% for lesson in topic_lessons %}
-            <article class="module-lesson" id="lesson-{{ lesson.id }}">
-              <span class="lesson-num">{{ '%02d'|format(loop.index) }}</span>
+            {% set status = lesson_states[lesson.id] %}
+            <article class="module-lesson {{ 'lesson-is-complete' if status.completed else 'lesson-is-locked' if not status.unlocked else 'lesson-is-current' }}" id="lesson-{{ lesson.id }}">
+              <span class="lesson-num">{{ icon('check') if status.completed else icon('lock') if not status.unlocked else '%02d'|format(loop.index) }}</span>
               <div class="module-lesson-copy"><h3>{{ lesson.title }}</h3>
-                {% if lesson.quiz_data %}<p>{{ lesson.quiz_data|length }} вопроса · попытки сохраняются</p>
-                {% elif lesson.video_url %}<p>Видеоурок · тест после урока{% if progress.get(lesson.id) and progress.get(lesson.id).completed %} · просмотрено{% endif %}</p>
-                {% else %}<p>Чтение · тест после урока</p>{% endif %}
+                <p class="lesson-state-label">{{ status.label }}{% if status.score is not none %} · {{ status.score }} / 10{% endif %}</p>
               </div>
-              <a class="button-dark lesson-open" href="{{ url_for('main.lesson_detail', course_id=course.id, lesson_id=lesson.id) }}">Открыть <span>{{ icon('arrow-up-right') }}</span></a>
+              {% if status.unlocked %}<a class="button-dark lesson-open" href="{{ url_for('main.lesson_detail', course_id=course.id, lesson_id=lesson.id) }}" aria-label="{{ 'Повторить' if status.completed else 'Открыть' }}: {{ lesson.title }}">{{ 'Повторить' if status.completed else 'Открыть' }} <span>{{ icon('arrow-up-right') }}</span></a>{% else %}<span class="lesson-lock-hint" title="Пройдите тест предыдущего урока">{{ icon('lock') }}<span>После предыдущего теста</span></span>{% endif %}
             </article>
             {% endfor %}
 

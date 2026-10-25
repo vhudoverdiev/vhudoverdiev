@@ -36,9 +36,11 @@
       </section>
       {% else %}
       {% set passed = attempt and attempt.score >= required_score %}
-      <section class="single-check check-result">
+      {% if celebration %}<div class="celebration-stage scene-{{ celebration.scene }}" aria-hidden="true" data-celebration>{% for particle in celebration.particles %}<i class="celebration-particle" style="--x:{{ particle.x }}%;--delay:{{ particle.delay }}ms;--duration:{{ particle.duration }}ms;--size:{{ particle.size }}px;--rotation:{{ particle.rotation }}deg;--color:{{ particle.color }}"></i>{% endfor %}</div>{% endif %}
+      <section class="single-check check-result {{ 'result-passed' if passed else '' }}">
         <span class="result-icon {{ 'passed' if passed else '' }}">{{ icon('check' if passed else 'repeat') }}</span>
-        <p class="eyebrow muted-eyebrow">РЕЗУЛЬТАТ СОХРАНЁН</p><h1>{{ 'Тест пройден' if passed else 'Ещё немного практики' }}</h1>
+        <p class="eyebrow muted-eyebrow">РЕЗУЛЬТАТ СОХРАНЁН</p><h1 tabindex="-1" data-check-heading>{{ 'Поздравляем, ты молодец!' if passed else 'Ещё немного практики' }}</h1>
+        {% if celebration %}<p class="celebration-message">{{ celebration.message }}</p>{% endif %}
         <p class="result-score">{{ attempt.score if attempt else 0 }} <span>из {{ questions|length }}</span></p>
         <p>{{ 'Можно переходить к следующему уроку.' if passed else 'Для прохождения нужно ' ~ required_score ~ ' правильных ответов. Повторите материал и попробуйте снова.' }}</p>
         {% if passed and following %}<a class="button-dark" href="{{ url_for('main.lesson_detail', course_id=course.id, lesson_id=following.id) }}">Следующий урок {{ icon('arrow-right') }}</a>{% elif passed %}<a class="button-dark" href="{{ url_for('main.course_detail', course_id=course.id) }}">К программе курса {{ icon('arrow-right') }}</a>{% endif %}

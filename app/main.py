@@ -6,6 +6,7 @@ from werkzeug.utils import safe_join
 
 from .models import Course, Lesson, LessonProgress, QuizAttempt
 from .services.course_service import published_courses
+from .services.learning_access import course_states, require_lesson_access
 
 bp = Blueprint("main", __name__)
 
@@ -48,7 +49,7 @@ def course_detail(course_id):
     attempts = {}
     for item in QuizAttempt.query.filter_by(user_id=current_user.id).join(Lesson).filter(Lesson.course_id == course.id).order_by(QuizAttempt.created_at.desc()).all():
         attempts.setdefault(item.lesson_id, item)
-    return render_template("course_detail.html", course=course, progress=progress, attempts=attempts)
+    return render_template("course_detail.html", course=course, progress=progress, attempts=attempts, lesson_states=course_states(course))
 
 
 @bp.get("/courses/<int:course_id>/lessons/<int:lesson_id>")
@@ -56,6 +57,7 @@ def course_detail(course_id):
 def lesson_detail(course_id, lesson_id):
     course = Course.query.filter_by(id=course_id, published=True).first_or_404()
     lesson = Lesson.query.filter_by(id=lesson_id, course_id=course.id).first_or_404()
+    lesson_status = require_lesson_access(lesson)
     progress = LessonProgress.query.filter_by(user_id=current_user.id, lesson_id=lesson.id).first()
     from .services.lesson_quiz import questions_for_lesson
     quiz_questions = questions_for_lesson(lesson)
@@ -65,15 +67,15 @@ def lesson_detail(course_id, lesson_id):
     quiz_passed = has_passed(lesson, quiz_questions) if quiz_questions else True
     previous = Lesson.query.filter_by(course_id=course.id).filter(Lesson.position < lesson.position, Lesson.quiz_data.is_(None)).order_by(Lesson.position.desc()).first()
     following = Lesson.query.filter_by(course_id=course.id).filter(Lesson.position > lesson.position, Lesson.quiz_data.is_(None)).order_by(Lesson.position.asc()).first()
-    return render_template("lesson_detail.html", course=course, lesson=lesson, progress=progress, attempt=attempt, previous=previous, following=following, quiz_lesson=quiz_lesson, quiz_questions=quiz_questions, quiz_passed=quiz_passed)
+    return render_template("lesson_detail.html", course=course, lesson=lesson, progress=progress, attempt=attempt, previous=previous, following=following, quiz_lesson=quiz_lesson, quiz_questions=quiz_questions, quiz_passed=quiz_passed, lesson_status=lesson_status)
 
 
 @bp.get("/media/<path:filename>")
 @login_required
 def media_file(filename):
     media_root = current_app.config.get("MEDIA_ROOT", safe_join(current_app.instance_path, "media"))
-    if not Lesson.query.join(Course).filter(Lesson.video_url == f"local:{filename}", Course.published.is_(True)).first():
-        abort(404)
+    lesson = Lesson.query.join(Course).filter(Lesson.video_url == f"local:{filename}", Course.published.is_(True)).first_or_404()
+    require_lesson_access(lesson)
     return send_from_directory(media_root, filename, conditional=True, max_age=0)
 
 
@@ -81,6 +83,7 @@ def media_file(filename):
 @login_required
 def lesson_resource(lesson_id, filename):
     lesson = Lesson.query.join(Course).filter(Lesson.id == lesson_id, Course.published.is_(True)).first_or_404()
+    require_lesson_access(lesson)
     if not any(resource.get("path") == filename for resource in (lesson.resources_json or [])):
         abort(404)
     media_root = current_app.config.get("MEDIA_ROOT", safe_join(current_app.instance_path, "media"))
@@ -91,6 +94,7 @@ def lesson_resource(lesson_id, filename):
 @login_required
 def update_lesson_progress(lesson_id):
     lesson = Lesson.query.join(Course).filter(Lesson.id == lesson_id, Course.published.is_(True)).first_or_404()
+    require_lesson_access(lesson)
     try:
         watched = max(0, min(100, int(request.form.get("watched_percent", "0"))))
     except ValueError:
@@ -101,7 +105,8 @@ def update_lesson_progress(lesson_id):
         from .extensions import db
         db.session.add(progress)
     progress.watched_percent = max(progress.watched_percent, watched)
-    progress.completed = progress.completed or watched >= 90
+    if lesson.course.course_type == "library":
+        progress.completed = progress.completed or watched >= 90
     progress.updated_at = datetime.utcnow()
     from .extensions import db
     db.session.commit()
@@ -112,6 +117,7 @@ def update_lesson_progress(lesson_id):
 
 def _check_lesson(lesson_id):
     lesson = Lesson.query.join(Course).filter(Lesson.id == lesson_id, Course.published.is_(True)).first_or_404()
+    require_lesson_access(lesson)
     from .services.lesson_quiz import questions_for_lesson
     questions = questions_for_lesson(lesson)
     if not questions or lesson.course.course_type == "library":
@@ -123,6 +129,7 @@ def _check_lesson(lesson_id):
 @login_required
 def lesson_check(lesson_id):
     from .services.quiz_flow import load_state, passing_score, latest_attempt
+    from .services.celebration import celebration_for
     lesson, questions = _check_lesson(lesson_id)
     state = load_state(lesson, questions)
     feedback = bool(state['feedback'] and state['answers'])
@@ -132,7 +139,8 @@ def lesson_check(lesson_id):
     return render_template('lesson_check.html', course=lesson.course, lesson=lesson, questions=questions,
                            question=questions[index] if index < len(questions) else None,
                            index=index, feedback=feedback, state=state, attempt=attempt,
-                           required_score=passing_score(questions), following=following)
+                           required_score=passing_score(questions), following=following,
+                           celebration=celebration_for(attempt) if attempt and attempt.score >= passing_score(questions) else None)
 
 
 @bp.post("/lessons/<int:lesson_id>/quiz/answer")

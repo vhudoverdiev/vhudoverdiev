@@ -123,7 +123,10 @@ def create_app(config_class=Config):
     @app.errorhandler(403)
     def forbidden(_error):
         from flask import render_template
-        return render_template("error.html", code=403, message="Недостаточно прав для этого действия."), 403
+        from flask import request, url_for
+        locked_course_id = request.environ.get("vhiti.locked_course_id")
+        message = "Сначала пройдите тест предыдущего урока: не менее 5 правильных ответов из 10." if request.path.startswith(("/courses/", "/lessons/", "/media/")) else "Недостаточно прав для этого действия."
+        return render_template("error.html", code=403, message=message, back_url=url_for("main.course_detail", course_id=locked_course_id) if locked_course_id else None), 403
 
     @app.errorhandler(404)
     def not_found(_error):
