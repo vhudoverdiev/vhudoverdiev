@@ -101,3 +101,24 @@ document.querySelectorAll('.quiz-form').forEach((form) => {
     if (button) { button.disabled = true; button.textContent = 'Проверяем ответы…'; }
   });
 });
+
+// Reveal the server-graded feedback before advancing; the reader can pause it.
+document.querySelectorAll('[data-auto-next]').forEach((form) => {
+  const delay = Number(form.dataset.autoNext);
+  const timer = window.setTimeout(() => form.requestSubmit(), delay);
+  form.querySelector('[data-pause-next]')?.addEventListener('click', (event) => {
+    window.clearTimeout(timer);
+    event.currentTarget.hidden = true;
+    const notice = form.querySelector('[data-advance-notice]');
+    if (notice) notice.textContent = 'Автопереход остановлен. Нажмите кнопку, когда будете готовы.';
+  });
+  form.addEventListener('submit', () => window.clearTimeout(timer));
+});
+
+if (document.querySelector('[data-check-heading]')) {
+  const resetQuestionPosition = () => {
+    document.querySelector('[data-check-heading]')?.focus({ preventScroll: true });
+    window.scrollTo(0, 0);
+  };
+  window.addEventListener('pageshow', resetQuestionPosition);
+}

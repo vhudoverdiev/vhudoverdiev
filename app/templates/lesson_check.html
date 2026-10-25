@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block title %}Тест · {{ lesson.title }}{% endblock %}
+{% block body_class %}app-body learning-body{% endblock %}
+{% block content %}
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <button type="button" class="icon-btn sidebar-toggle" aria-label="Закрыть меню">{{ icon('close') }}</button>
+    <a class="brand brand-light" href="{{ url_for('main.dashboard') }}"><span class="brand-mark">В</span><span>Войти в IT</span></a>
+    <nav class="side-nav"><a class="side-link" href="{{ url_for('main.dashboard') }}">{{ icon('grid') }}Обзор</a></nav>
+  </aside>
+  <main class="main-area">
+    <header class="topbar"><button class="mobile-menu icon-btn" aria-label="Открыть меню">{{ icon('menu') }}</button><div class="breadcrumb"><a href="{{ url_for('main.lesson_detail', course_id=course.id, lesson_id=lesson.id) }}">К уроку</a></div><div class="topbar-right"><span class="top-avatar">{{ current_user.name[:1]|upper }}</span></div></header>
+    <div class="page-content check-page">
+      <a class="back-link" href="{{ url_for('main.lesson_detail', course_id=course.id, lesson_id=lesson.id) }}">{{ icon('arrow-left') }} Вернуться к видео</a>
+      <p class="check-topic">{{ lesson.title }}</p>
+      {% if question %}
+      <section class="single-check">
+        <div class="check-meta"><span>Вопрос {{ index + 1 }} из {{ questions|length }}</span><span>Проходной — {{ required_score }} из {{ questions|length }}</span></div>
+        <progress class="check-progress" value="{{ index + (1 if feedback else 0) }}" max="{{ questions|length }}" aria-label="Прогресс теста"></progress>
+        <h1 tabindex="-1" data-check-heading>{{ question.prompt }}</h1>
+        {% if not feedback %}
+        <form method="post" action="{{ url_for('main.answer_lesson_check', lesson_id=lesson.id) }}" class="single-answer-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="question_index" value="{{ index }}">
+          {% for option in question.options %}<button class="check-option" type="submit" name="answer" value="{{ loop.index0 }}"><span class="option-letter">{{ 'АБВГДЕЖЗ'[loop.index0] }}</span><span>{{ option }}</span></button>{% endfor %}
+        </form>
+        {% else %}
+        {% set selected = state.answers[index] %}{% set correct = selected == question.correct %}
+        <div class="answer-feedback {{ 'is-correct' if correct else 'is-incorrect' }}" role="status"><strong>{{ icon('check' if correct else 'close') }} {{ 'Верно' if correct else 'Неверно' }}</strong><p>{{ question.explanation }}</p></div>
+        <div class="check-reviewed-options">{% for option in question.options %}<div class="check-option {{ 'check-correct' if loop.index0 == question.correct else 'check-wrong' if loop.index0 == selected else '' }}"><span class="option-letter">{{ 'АБВГДЕЖЗ'[loop.index0] }}</span><span>{{ option }}{% if loop.index0 == question.correct %}<small>Правильный ответ</small>{% elif loop.index0 == selected %}<small>Ваш ответ</small>{% endif %}</span></div>{% endfor %}</div>
+        <form method="post" action="{{ url_for('main.next_check_question', lesson_id=lesson.id) }}" class="check-next-form" data-auto-next="6000">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="check-next-actions"><button class="button-dark" type="submit">{{ 'Результат теста' if index + 1 == questions|length else 'Следующий вопрос' }} {{ icon('arrow-right') }}</button><button class="pause-advance" type="button" data-pause-next>Остановить автопереход</button></div>
+          <p class="advance-notice" data-advance-notice>Переходим дальше через 6 секунд.</p>
+        </form>
+        {% endif %}
+      </section>
+      {% else %}
+      {% set passed = attempt and attempt.score >= required_score %}
+      <section class="single-check check-result">
+        <span class="result-icon {{ 'passed' if passed else '' }}">{{ icon('check' if passed else 'repeat') }}</span>
+        <p class="eyebrow muted-eyebrow">РЕЗУЛЬТАТ СОХРАНЁН</p><h1>{{ 'Тест пройден' if passed else 'Ещё немного практики' }}</h1>
+        <p class="result-score">{{ attempt.score if attempt else 0 }} <span>из {{ questions|length }}</span></p>
+        <p>{{ 'Можно переходить к следующему уроку.' if passed else 'Для прохождения нужно ' ~ required_score ~ ' правильных ответов. Повторите материал и попробуйте снова.' }}</p>
+        {% if passed and following %}<a class="button-dark" href="{{ url_for('main.lesson_detail', course_id=course.id, lesson_id=following.id) }}">Следующий урок {{ icon('arrow-right') }}</a>{% elif passed %}<a class="button-dark" href="{{ url_for('main.course_detail', course_id=course.id) }}">К программе курса {{ icon('arrow-right') }}</a>{% endif %}
+        <form method="post" action="{{ url_for('main.restart_lesson_check', lesson_id=lesson.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="{{ 'pause-advance' if passed else 'button-dark' }}" type="submit">Пройти ещё раз</button></form>
+      </section>
+      {% endif %}
+    </div>
+  </main>
+</div>
+{% endblock %}

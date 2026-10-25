@@ -60,10 +60,12 @@ def lesson_detail(course_id, lesson_id):
     from .services.lesson_quiz import questions_for_lesson
     quiz_questions = questions_for_lesson(lesson)
     quiz_lesson = lesson
-    attempt = None if request.args.get("retake") == "1" else QuizAttempt.query.filter_by(user_id=current_user.id, lesson_id=lesson.id, question_count=len(quiz_questions)).order_by(QuizAttempt.created_at.desc()).first()
+    from .services.quiz_flow import latest_attempt, has_passed
+    attempt = latest_attempt(lesson, quiz_questions) if quiz_questions else None
+    quiz_passed = has_passed(lesson, quiz_questions) if quiz_questions else True
     previous = Lesson.query.filter_by(course_id=course.id).filter(Lesson.position < lesson.position, Lesson.quiz_data.is_(None)).order_by(Lesson.position.desc()).first()
     following = Lesson.query.filter_by(course_id=course.id).filter(Lesson.position > lesson.position, Lesson.quiz_data.is_(None)).order_by(Lesson.position.asc()).first()
-    return render_template("lesson_detail.html", course=course, lesson=lesson, progress=progress, attempt=attempt, previous=previous, following=following, quiz_lesson=quiz_lesson, quiz_questions=quiz_questions)
+    return render_template("lesson_detail.html", course=course, lesson=lesson, progress=progress, attempt=attempt, previous=previous, following=following, quiz_lesson=quiz_lesson, quiz_questions=quiz_questions, quiz_passed=quiz_passed)
 
 
 @bp.get("/media/<path:filename>")
@@ -108,32 +110,78 @@ def update_lesson_progress(lesson_id):
     return "", 204
 
 
-@bp.post("/lessons/<int:lesson_id>/quiz")
-@login_required
-def submit_lesson_quiz(lesson_id):
+def _check_lesson(lesson_id):
     lesson = Lesson.query.join(Course).filter(Lesson.id == lesson_id, Course.published.is_(True)).first_or_404()
     from .services.lesson_quiz import questions_for_lesson
     questions = questions_for_lesson(lesson)
     if not questions or lesson.course.course_type == "library":
         abort(404)
-    return_lesson = Lesson.query.filter_by(id=request.form.get("return_lesson_id", type=int), course_id=lesson.course_id).first()
-    return_lesson = return_lesson or lesson
-    answers = []
-    score = 0
-    for index, question in enumerate(questions):
-        try:
-            selected = int(request.form.get(f"question-{index}", "-1"))
-        except ValueError:
-            selected = -1
-        if selected < 0 or selected >= len(question["options"]):
-            flash("Ответьте на все вопросы перед отправкой.", "error")
-            return redirect(url_for("main.lesson_detail", course_id=lesson.course_id, lesson_id=return_lesson.id, _anchor="lesson-quiz"))
-        correct = selected == int(question["correct"])
-        score += int(correct)
-        answers.append({"selected": selected, "correct": correct})
-    attempt = QuizAttempt(user_id=current_user.id, lesson_id=lesson.id, score=score, question_count=len(questions), answers_json=answers)
+    return lesson, questions
+
+
+@bp.get("/lessons/<int:lesson_id>/quiz")
+@login_required
+def lesson_check(lesson_id):
+    from .services.quiz_flow import load_state, passing_score, latest_attempt
+    lesson, questions = _check_lesson(lesson_id)
+    state = load_state(lesson, questions)
+    feedback = bool(state['feedback'] and state['answers'])
+    index = len(state['answers']) - 1 if feedback else len(state['answers'])
+    following = Lesson.query.filter_by(course_id=lesson.course_id).filter(Lesson.position > lesson.position, Lesson.quiz_data.is_(None)).order_by(Lesson.position).first()
+    attempt = latest_attempt(lesson, questions) if index >= len(questions) else None
+    return render_template('lesson_check.html', course=lesson.course, lesson=lesson, questions=questions,
+                           question=questions[index] if index < len(questions) else None,
+                           index=index, feedback=feedback, state=state, attempt=attempt,
+                           required_score=passing_score(questions), following=following)
+
+
+@bp.post("/lessons/<int:lesson_id>/quiz/answer")
+@login_required
+def answer_lesson_check(lesson_id):
+    from .services.quiz_flow import load_state, save_state, passing_score
     from .extensions import db
-    db.session.add(attempt)
-    db.session.commit()
-    flash(f"Результат: {score} из {len(questions)}. Попытка сохранена в прогрессе.", "success" if score == len(questions) else "info")
-    return redirect(url_for("main.lesson_detail", course_id=lesson.course_id, lesson_id=return_lesson.id, _anchor="lesson-quiz"))
+    lesson, questions = _check_lesson(lesson_id)
+    state = load_state(lesson, questions)
+    index = request.form.get('question_index', type=int)
+    selected = request.form.get('answer', type=int)
+    if state['feedback'] or index != len(state['answers']) or len(state['answers']) >= len(questions):
+        return redirect(url_for('main.lesson_check', lesson_id=lesson.id))
+    if selected is None or not 0 <= selected < len(questions[index]['options']):
+        abort(400)
+    state['answers'].append(selected)
+    state['feedback'] = True
+    if len(state['answers']) == len(questions):
+        answers = [{'selected': choice, 'correct': choice == questions[i]['correct']} for i, choice in enumerate(state['answers'])]
+        answers[0]['quiz_version'] = state['version']
+        score = sum(answer['correct'] for answer in answers)
+        db.session.add(QuizAttempt(user_id=current_user.id, lesson_id=lesson.id, score=score, question_count=len(questions), answers_json=answers))
+        if score >= passing_score(questions):
+            progress = LessonProgress.query.filter_by(user_id=current_user.id, lesson_id=lesson.id).first()
+            if progress is None:
+                progress = LessonProgress(user_id=current_user.id, lesson_id=lesson.id)
+                db.session.add(progress)
+            progress.completed = True
+            progress.updated_at = datetime.utcnow()
+        db.session.commit()
+    save_state(lesson, state)
+    return redirect(url_for('main.lesson_check', lesson_id=lesson.id))
+
+
+@bp.post("/lessons/<int:lesson_id>/quiz/next")
+@login_required
+def next_check_question(lesson_id):
+    from .services.quiz_flow import load_state, save_state
+    lesson, questions = _check_lesson(lesson_id)
+    state = load_state(lesson, questions)
+    state['feedback'] = False
+    save_state(lesson, state)
+    return redirect(url_for('main.lesson_check', lesson_id=lesson.id))
+
+
+@bp.post("/lessons/<int:lesson_id>/quiz/restart")
+@login_required
+def restart_lesson_check(lesson_id):
+    from .services.quiz_flow import load_state
+    lesson, questions = _check_lesson(lesson_id)
+    load_state(lesson, questions, reset=True)
+    return redirect(url_for('main.lesson_check', lesson_id=lesson.id))

@@ -9,6 +9,24 @@ from .quiz_bank import facts_for
 def questions_for_lesson(lesson):
     if lesson.course.course_type == "library":
         return []
+    if lesson.course.title.startswith('Английский') and not lesson.quiz_data:
+        from pathlib import Path
+        from .english_lesson_bank import LESSONS
+        filename = Path((lesson.video_url or '').removeprefix('local:')).name or lesson.title
+        filename = re.sub(r'^\[[^]]+\]\s*', '', filename)
+        number = re.match(r'\s*(\d+)', filename)
+        rows = LESSONS.get(int(number.group(1))) if number else None
+        if rows:
+            facts = [row.split('|', 1) for row in rows.splitlines()]
+            rng = random.Random(f'english-lesson-v1:{lesson.id}')
+            questions = []
+            for term, definition in facts:
+                options = [definition] + rng.sample([text for other, text in facts if other != term], 3)
+                rng.shuffle(options)
+                questions.append({'prompt': f'Какое описание соответствует понятию «{term}»?',
+                                  'options': options, 'correct': options.index(definition),
+                                  'explanation': f'{term} — {definition[0].lower() + definition[1:]}.'})
+            return questions
     topic_check = lesson if lesson.quiz_data else Lesson.query.filter_by(
         course_id=lesson.course_id, module_name=lesson.module_name
     ).filter(Lesson.quiz_data.isnot(None)).order_by(Lesson.position).first()
@@ -37,4 +55,5 @@ def questions_for_lesson(lesson):
             'correct': options.index(definition),
             'explanation': f'{term} — {definition[0].lower() + definition[1:]}.',
         })
-    return questions
+    # Different deterministic subsets per lesson; no option changes during an attempt.
+    return rng.sample(questions, min(10, len(questions)))

@@ -27,27 +27,17 @@
       </div></section>
       {% endif %}
       {% if quiz_questions %}
-      <section class="quiz-panel" id="lesson-quiz"><div class="quiz-panel-heading"><span class="quiz-panel-icon">{{ icon('check') }}</span><div><div class="eyebrow muted-eyebrow">ПРОВЕРКА ЗНАНИЙ · {{ quiz_questions|length }} ВОПРОСОВ</div><h2>Закрепим урок</h2><p>Ответьте на вопросы по теме этого урока. Результат сохранится в вашем прогрессе.</p></div></div>
-        {% if attempt %}<p class="quiz-last-result">Последняя попытка: <strong>{{ attempt.score }} из {{ attempt.question_count }}</strong></p>{% endif %}
-        <form method="post" action="{{ url_for('main.submit_lesson_quiz', lesson_id=quiz_lesson.id) }}" class="quiz-form" data-question-count="{{ quiz_questions|length }}">
-          <p class="quiz-status" aria-live="polite">Выбрано ответов: <span data-answer-count>0</span> из {{ quiz_questions|length }}</p>
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input type="hidden" name="return_lesson_id" value="{{ lesson.id }}">
-          {% for question in quiz_questions %}
-          {% set question_index = loop.index0 %}
-          <fieldset class="quiz-question"><legend>{{ loop.index }}. {{ question.prompt }}</legend>
-            {% set answer = attempt.answers_json[question_index] if attempt else none %}
-            {% for option in question.options %}<label class="quiz-option{% if attempt and loop.index0 == question.correct %} quiz-option-correct{% elif attempt and answer.selected == loop.index0 %} quiz-option-wrong{% endif %}"><input type="radio" name="question-{{ question_index }}" value="{{ loop.index0 }}" {% if answer and answer.selected == loop.index0 %}checked{% endif %} required {% if attempt %}disabled{% endif %}><span>{{ option }}</span>{% if attempt and loop.index0 == question.correct %}<strong class="answer-mark">Верно</strong>{% endif %}</label>{% endfor %}
-            {% if attempt %}<p class="quiz-explanation"><strong>Разбор:</strong> {{ question.explanation }}</p>{% endif %}
-          </fieldset>
-          {% endfor %}
-          {% if not attempt %}<button class="button-dark" type="submit">Проверить ответы <span>{{ icon('arrow-up-right') }}</span></button>{% else %}<a class="button-dark" href="{{ url_for('main.lesson_detail', course_id=course.id, lesson_id=lesson.id, retake=1, _anchor='lesson-quiz') }}">Пройти ещё раз <span>{{ icon('repeat') }}</span></a>{% endif %}
-        </form>
+      <section class="quiz-panel quiz-entry" id="lesson-quiz">
+        <span class="eyebrow muted-eyebrow">ПРОВЕРКА ЗНАНИЙ · {{ quiz_questions|length }} ВОПРОСОВ</span>
+        <h2>Закрепим урок</h2>
+        <p>Один вопрос за раз. Результат виден сразу после выбора ответа. Для прохождения нужно {{ (quiz_questions|length + 1) // 2 }} правильных ответов.</p>
+        {% if attempt %}<p class="quiz-last-result">{{ 'Тест пройден' if attempt.score * 2 >= attempt.question_count else 'Попробуйте ещё раз' }} · {{ attempt.score }} из {{ attempt.question_count }}</p>{% endif %}
+        <a class="button-dark" href="{{ url_for('main.lesson_check', lesson_id=lesson.id) }}">{{ 'Открыть тест' if attempt else 'Начать тест' }} {{ icon('arrow-right') }}</a>
       </section>
       {% endif %}
       <nav class="lesson-pager" aria-label="Навигация по урокам">
         {% if previous %}<a class="text-link" href="{{ url_for('main.lesson_detail', course_id=course.id, lesson_id=previous.id) }}">{{ icon('arrow-left') }} {{ previous.title }}</a>{% else %}<span></span>{% endif %}
-        {% if following %}<a class="button-dark" href="{{ url_for('main.lesson_detail', course_id=course.id, lesson_id=following.id) }}">Следующий урок <span>{{ icon('arrow-right') }}</span></a>{% endif %}
+        {% if following and quiz_passed %}<a class="button-dark" href="{{ url_for('main.lesson_detail', course_id=course.id, lesson_id=following.id) }}">Следующий урок <span>{{ icon('arrow-right') }}</span></a>{% endif %}
       </nav>
     </div>
   </main>
