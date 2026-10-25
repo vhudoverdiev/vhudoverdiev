@@ -10,7 +10,7 @@
     <nav class="side-nav" aria-label="Основная навигация">
       <a class="side-link" href="{{ url_for('main.dashboard') }}"><span class="nav-icon">{{ icon('grid') }}</span>Обзор</a>
 
-    </nav>
+    {% include '_admin_progress_link.html' %}</nav>
     <div class="sidebar-bottom"><small class="sidebar-copy">© 2026 Войти в IT</small></div>
   </aside>
   <main class="main-area">
@@ -45,7 +45,7 @@
             <article class="module-lesson {{ 'lesson-is-complete' if status.completed else 'lesson-is-locked' if not status.unlocked else 'lesson-is-current' }}" id="lesson-{{ lesson.id }}">
               <span class="lesson-num">{{ icon('check') if status.completed else icon('lock') if not status.unlocked else '%02d'|format(loop.index) }}</span>
               <div class="module-lesson-copy"><h3>{{ lesson.title }}</h3>
-                <p class="lesson-state-label">{{ status.label }}{% if status.score is not none %} · {{ status.score }} / 10{% endif %}</p>
+                <p class="lesson-state-label">{{ status.label }}{% if status.score is not none %} · {{ status.score }} / {{ status.score_total }}{% endif %}{% if status.source %}<span class="completion-source">{{ status.source }}</span>{% endif %}</p>
               </div>
               {% if status.unlocked %}<a class="button-dark lesson-open" href="{{ url_for('main.lesson_detail', course_id=course.id, lesson_id=lesson.id) }}" aria-label="{{ 'Повторить' if status.completed else 'Открыть' }}: {{ lesson.title }}">{{ 'Повторить' if status.completed else 'Открыть' }} <span>{{ icon('arrow-up-right') }}</span></a>{% else %}<span class="lesson-lock-hint" title="Пройдите тест предыдущего урока">{{ icon('lock') }}<span>После предыдущего теста</span></span>{% endif %}
             </article>

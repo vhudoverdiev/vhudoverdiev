@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block title %}Управление прогрессом{% endblock %}
+{% block body_class %}app-body learning-body{% endblock %}
+{% block content %}
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"><button class="icon-btn sidebar-toggle" aria-label="Закрыть меню">{{ icon('close') }}</button><a class="brand brand-light" href="{{ url_for('main.dashboard') }}"><span class="brand-mark">В</span><span>Войти в IT</span></a><nav class="side-nav"><a class="side-link" href="{{ url_for('main.dashboard') }}">{{ icon('grid') }}Обзор</a>{% include '_admin_progress_link.html' %}</nav></aside>
+  <main class="main-area"><header class="topbar"><button class="mobile-menu icon-btn" aria-label="Открыть меню">{{ icon('menu') }}</button><div class="breadcrumb">Управление прогрессом</div><div class="topbar-right"><span class="top-avatar">{{ current_user.name[:1]|upper }}</span></div></header>
+    <div class="page-content progress-admin-page">
+      <span class="eyebrow muted-eyebrow">ДОСТУПНО ТОЛЬКО АДМИНИСТРАТОРУ</span><h1>Прогресс учеников</h1><p class="admin-progress-intro">Откройте нужный раздел или зачтите результат вручную. История ответов ученика сохраняется.</p>
+      <form method="get" class="progress-filters"><label>Ученик<select name="user_id">{% for user in users %}<option value="{{ user.id }}" {% if user.id == learner.id %}selected{% endif %}>{{ user.name }} · {{ user.email }}</option>{% endfor %}</select></label><label>Курс<select name="course_id">{% for item in courses %}<option value="{{ item.id }}" {% if course and item.id == course.id %}selected{% endif %}>{{ item.title }}</option>{% endfor %}</select></label><button class="button-dark" type="submit">Показать</button></form>
+      {% if course %}<div class="admin-selection-note">Изменения применяются к: <strong>{{ learner.name }}</strong> · {{ course.title }}</div>{% endif %}
+      {% for module, lessons in modules.items() %}
+      <section class="progress-admin-module"><header><div><small>РАЗДЕЛ {{ loop.index }}</small><h2>{{ module }}</h2></div><form method="post" action="{{ url_for('admin_progress.grant') }}" class="admin-grant-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="user_id" value="{{ learner.id }}"><input type="hidden" name="course_id" value="{{ course.id }}"><input type="hidden" name="module" value="{{ module }}"><button class="admin-open-button" type="submit" name="action" value="unlock_module">Открыть раздел</button><button class="button-dark" type="submit" name="action" value="pass_module">Зачесть раздел 10/10</button></form></header>
+      <div>{% for lesson in lessons %}{% set status = states[lesson.id] %}<article class="admin-progress-row"><div><strong>{{ lesson.title }}</strong><p>{{ status.label }}{% if status.score is not none %} · {{ status.score }}/{{ status.score_total }}{% endif %}{% if status.source %} · {{ status.source }}{% endif %}</p></div><form method="post" action="{{ url_for('admin_progress.grant') }}" class="admin-grant-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="user_id" value="{{ learner.id }}"><input type="hidden" name="course_id" value="{{ course.id }}"><input type="hidden" name="lesson_id" value="{{ lesson.id }}"><button class="admin-open-button" type="submit" name="action" value="unlock_lesson" aria-label="Открыть урок: {{ lesson.title }}">Открыть</button><button class="admin-credit-button" type="submit" name="action" value="pass_lesson" aria-label="Зачесть 10 из 10: {{ lesson.title }}">Зачесть 10/10</button></form></article>{% endfor %}</div></section>
+      {% else %}<p>В этом курсе пока нет уроков.</p>{% endfor %}
+    </div>
+  </main>
+</div>
+{% endblock %}

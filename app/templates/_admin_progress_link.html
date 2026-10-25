@@ -1,0 +1,1 @@
+{% if current_user.is_admin %}<a class="side-link" href="{{ url_for('admin_progress.index', course_id=course.id if course is defined else none) }}">{{ icon('grid') }}Прогресс учеников</a>{% endif %}

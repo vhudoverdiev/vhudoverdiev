@@ -62,9 +62,9 @@ def lesson_detail(course_id, lesson_id):
     from .services.lesson_quiz import questions_for_lesson
     quiz_questions = questions_for_lesson(lesson)
     quiz_lesson = lesson
-    from .services.quiz_flow import latest_attempt, has_passed
+    from .services.quiz_flow import latest_attempt
     attempt = latest_attempt(lesson, quiz_questions) if quiz_questions else None
-    quiz_passed = has_passed(lesson, quiz_questions) if quiz_questions else True
+    quiz_passed = lesson_status["completed"] if quiz_questions else True
     previous = Lesson.query.filter_by(course_id=course.id).filter(Lesson.position < lesson.position, Lesson.quiz_data.is_(None)).order_by(Lesson.position.desc()).first()
     following = Lesson.query.filter_by(course_id=course.id).filter(Lesson.position > lesson.position, Lesson.quiz_data.is_(None)).order_by(Lesson.position.asc()).first()
     return render_template("lesson_detail.html", course=course, lesson=lesson, progress=progress, attempt=attempt, previous=previous, following=following, quiz_lesson=quiz_lesson, quiz_questions=quiz_questions, quiz_passed=quiz_passed, lesson_status=lesson_status)

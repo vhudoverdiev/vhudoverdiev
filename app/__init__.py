@@ -24,6 +24,8 @@ def create_app(config_class=Config):
     from .main import bp as main_bp
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
+    from .admin_progress import bp as admin_progress_bp
+    app.register_blueprint(admin_progress_bp)
     from datetime import datetime
     app.context_processor(lambda: {"now": datetime.now})
 

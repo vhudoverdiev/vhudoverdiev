@@ -44,8 +44,6 @@ def save_state(lesson, state):
 
 
 def has_passed(lesson, questions):
-    version = fingerprint(questions)
-    for attempt in QuizAttempt.query.filter_by(user_id=current_user.id, lesson_id=lesson.id, question_count=len(questions)).filter(QuizAttempt.score >= passing_score(questions)):
-        if attempt.answers_json and attempt.answers_json[0].get('quiz_version') == version:
-            return True
-    return False
+    # Completion is durable; question versions only control feedback compatibility.
+    from .learning_access import course_states
+    return course_states(lesson.course).get(lesson.id, {}).get('completed', False)
